@@ -4,8 +4,8 @@ title: Hunting and Squashing bugs since 2001
 theme: terminal
 
 owner: Mathieu Lacage
-keywords:
-copyright:
+keywords: Mathieu Lacage
+copyright: Mathieu Lacage
 
 markup:
   tableOfContents:
@@ -27,7 +27,7 @@ menu:
   main:
     - identifier: about
       name: About
-      url: /about
+      url: /
     - identifier: code-projects
       name: Code projects
       url: /code-projects
