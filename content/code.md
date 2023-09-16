@@ -1,5 +1,5 @@
 +++
-title = "Code projects"
+title = "Code"
 toc = true
 toclevels = 1
 +++

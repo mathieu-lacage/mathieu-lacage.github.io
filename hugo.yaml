@@ -28,18 +28,15 @@ menu:
     - identifier: about
       name: About
       url: /
-    - identifier: code-projects
-      name: Code projects
-      url: /code-projects
-#  [[menu.main]]
-#    identifier = "my-library"
-#    name = "Library"
-#    url = "/library"
-#  [[menu.main]]
-#    identifier = "documentation"
-#    name = "Documentation"
-#    url = "/documentation"
-#  [[menu.main]]
-#    identifier = "make-projects"
-#    name = "Make Projects"
-#    url = "/make-projects"
+    - identifier: text
+      name: Text
+      url: /text
+    - identifier: code
+      name: Code
+      url: /code
+#    - identifier = "library"
+#      name = "Library"
+#      url = "/library"
+#    - identifier = "make"
+#      name = "Make"
+#      url = "/make"
