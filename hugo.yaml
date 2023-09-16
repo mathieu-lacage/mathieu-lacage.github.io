@@ -34,9 +34,9 @@ menu:
     - identifier: code
       name: Code
       url: /code
-#    - identifier = "library"
-#      name = "Library"
-#      url = "/library"
+    - identifier: library
+      name: Library
+      url: /library
 #    - identifier = "make"
 #      name = "Make"
 #      url = "/make"
