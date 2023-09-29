@@ -6,5 +6,9 @@ all: cv.pdf cv-french.pdf
 view: cv.pdf
 	evince cv.pdf
 
-clean: cv.pdf
+clean: cv.pdf cv-french.pdf
 	rm $^
+
+install: cv.pdf
+	cp cv.pdf ../static/pdf/resume.pdf
+
