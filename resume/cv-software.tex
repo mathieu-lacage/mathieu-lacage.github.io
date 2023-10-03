@@ -1,0 +1,173 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage{cmbright}
+\usepackage[latin1]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[a4paper]{geometry}
+\usepackage[dvips]{graphicx}
+\usepackage[dvips]{graphics}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage{url}
+
+
+\renewcommand{\arraystretch}{1.2}
+\pagestyle{empty}
+
+
+\newcommand{\ligne}[1]{\rule[0.5ex]{\textwidth}{#1}\\}
+\newcommand{\activite}[1]{\textit{#1}\ }
+  
+\newcommand{\interRubrique}{\bigskip}
+\newcommand{\styleRub}[1]{\textbf{\large #1}\par}
+\newcommand{\indentStd}{\noindent\hspace*{10pt}}
+
+
+
+\newenvironment{rubrique}[2][\linewidth]% "rubrique" prend deux arguments
+{\styleRub{#2}%       			% le second argument : titre
+\ligne{0.5mm}
+\setlength{\lenB}{#1}%		       	% Le premier argument :indentation
+\setlength{\lenC}{\linewidth}%		% Calculs...
+\addtolength{\lenC}{-\lenA}%
+\addtolength{\lenC}{-\lenB}%
+%\addtolength{\lenC}{-\parindent}%
+\addtolength{\lenC}{-19pt}
+\indentStd\begin{tabular}[t]{p{\lenB}p{\lenC}}}
+{\end{tabular}}
+
+\newenvironment{rubriquesansligne}[2][\linewidth]% "rubrique" prend deux arguments
+{\styleRub{#2}%       			% le second argument : titre
+\setlength{\lenB}{#1}%		       	% Le premier argument :indentation
+\setlength{\lenC}{\linewidth}%		% Calculs...
+\addtolength{\lenC}{-\lenA}%
+\addtolength{\lenC}{-\lenB}%
+\addtolength{\lenC}{-\parindent}%
+\addtolength{\lenC}{-19pt}
+\indentStd\begin{tabular}[t]{p{\lenB}p{\lenC}}}
+{\end{tabular}}
+
+\newlength{\lenA} % indentation au début d'une ligne
+\setlength{\lenA}{0.cm}
+\newlength{\lenB} % Taille champ dates
+\newlength{\lenC} % Taille champ description
+%\newlength{\lenD}
+
+
+\geometry{hmargin={2cm, 2cm}, vmargin={2cm, 2cm}}
+
+\begin{document}
+
+
+\begin{tabular*}{1\textwidth}{@{\extracolsep{\fill}}lr}
+Mathieu Lacage & mathieu.lacage@cutebugs.net\\
+\end{tabular*}
+
+\vspace{1cm}
+\begin{center}{\huge Software Engineer}\end{center}
+
+\begin{center}
+Experienced Software Engineer seeking hands-on technical role.\newline
+I write, rewrite, and refactor code to create
+secure applications that scale.
+\end{center}
+
+\vspace{1cm}
+\begin{rubrique}{Technical Experience}
+
+Technology
+\begin{itemize}
+\item Languages: C, C++, Python, SQL
+\item Tools: MySQL, Ansible, uWSGI, Prometheus, Grafana, HCVault
+\end{itemize}
+
+Select achivements 
+\begin{itemize}
+\item Pub/Sub Streaming websocket server that handles 4K events per cpu.
+\item Automated validation of all API input and output via openAPI specifications.
+\item Zero-downtime scale up of our single database/single table to partionned
+ databases per customer, 250 tables, 1TB.
+\end{itemize}
+
+\end{rubrique}
+
+\begin{rubrique}{Alcmeon, 2011 -- 2023, CTO, co-founder}
+
+As CTO, I 
+\begin{itemize}
+\item Deployed practical solutions to improve the confidentiality 
+        without impairing the availability of customer data via 
+        at-rest encryption, and, centralized access control.
+\item Scaled our code and infrastructure to sustain
+        50\% YoY volume growth with 1000\% YoY peak volume growth.
+\item Recruited and led the technical team (8 years)
+\item Grew and directly managed the engineering manager and product
+        director.
+\end{itemize}
+
+
+As co-founder, I focused on
+\begin{itemize}
+\item Delivering high quality customer support
+\item Product design to ensure we build features that grow our business
+\item Presales to help close deals with prospects
+\end{itemize}
+
+\end{rubrique}
+
+\pagebreak
+
+\begin{rubrique}{INRIA, 2005 -- 2011, Software Lead ns-3}
+  Built ns-3, an open-source network simulator now used in hundreds of research publications every year. 
+ 
+  \begin{itemize}
+  \item Designed and implemented core APIs: object model, network packets, event scheduler
+  \item Implemented models for UDP/IP/ICMP, MAC/PHY Wi-Fi network protocols
+  \item Integrated unmodified real-world network protocol implementations
+  \end{itemize}
+
+  But also:
+  \begin{itemize}
+  \item Recruited, and managed local development team (5).
+  \item Relocated to University of Washington for 10 months to initiate collaboration with US team.
+  \item Evangelized use of ns-3 within other research institutes via
+    presentations and seminars.
+  \item Published as main author (4) and co-author (3) papers on ns-3.
+  \end{itemize}
+
+\end{rubrique}
+
+\vspace{0.5cm}
+\begin{rubrique}{INRIA, 2003 -- 2005, Software Engineer}
+
+  Designed and built software for network research teams:  
+  \begin{itemize}
+  \item Yans, a C++ event-driven simulator,
+  \item NEPI, a python tool used to describe, deploy, and control networking
+    experiments on hundreds of hosts distributed all over the planet.
+  \end{itemize}
+
+  Provided software mentoring to research projects involved in 
+  bio-reactor chemical reaction control and medical image analysis.
+
+\end{rubrique}
+
+\vspace{0.5cm}
+\begin{rubrique}{Sigma-Designs, 2001 -- 2003, Software Engineer}
+
+  Implemented DVD navigation control software for the video
+  decompression chips that were developped by Sigma-Designs and
+  sold to OEMs to build consumer DVD players.
+
+\end{rubrique}
+
+\vspace{0.5cm}
+\begin{rubrique} [4cm] {Education}
+  2006 -- 2010 & Ph.D. at University of Nice,
+  \emph{Experimentation Tools for Networking Research}, under supervision from Walid Dabbous\\
+  1998 -- 2001 & Engineer at Telecom ParisTech (ENST), Software Engineering, Networking, Micro-Electronics \\
+\end{rubrique}
+
+\end{document}
+
+
