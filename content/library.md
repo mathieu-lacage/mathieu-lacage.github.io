@@ -318,13 +318,13 @@ I own a first edition. I heard that the second edition is at least as good.
 This is a must-read to understand the practicalities of testing and debugging
 in software
 
-### Debugging: the 9 Indispensable Rules for Finding Event the Most Elusive Software and Hardware Problems
+### Debugging: the 9 Indispensable Rules for Finding Even the Most Elusive Software and Hardware Problems
 
 [David J. Agans](https://www.goodreads.com/book/show/3938178)
 
 Despite the absurd title, this is a terrific book about debugging in general. This is
 an entertaining and easy read, most probably the book that I have had the most
-success to get others to read it.
+success to share with others.
 
 ### Find the bug: A Book of Incorrect Programs
 
