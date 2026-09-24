@@ -1,38 +1,45 @@
-\documentclass[a4paper,12pt]{article}
+\documentclass[a4paper,11pt]{article}
 
-\usepackage{cmbright}
-\usepackage[latin1]{inputenc}
 \usepackage[T1]{fontenc}
 \usepackage[a4paper]{geometry}
-\usepackage[dvips]{graphicx}
-\usepackage[dvips]{graphics}
-\usepackage{times}
+% cmbright + times were both loaded; times won, so the body was set in
+% Helvetica. This keeps that look with a single font package.
+\usepackage[scaled]{helvet}
+\renewcommand{\familydefault}{\sfdefault}
 \usepackage{latexsym}
 \usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\usepackage{needspace}
+\setlist[itemize]{itemsep=1pt,parsep=0pt,topsep=3pt}
 
 
 \renewcommand{\arraystretch}{1.2}
 \pagestyle{empty}
 
 
-\newcommand{\ligne}[1]{\rule[0.5ex]{\textwidth}{#1}\\}
+\newcommand{\ligne}[1]{\noindent\rule[0.5ex]{\textwidth}{#1}\\}
 \newcommand{\activite}[1]{\textit{#1}\ }
   
 \newcommand{\interRubrique}{\bigskip}
-\newcommand{\styleRub}[1]{\textbf{\large #1}\par}
+\newcommand{\styleRub}[1]{\needspace{6\baselineskip}\noindent\textbf{\large #1}\par\nopagebreak}
 \newcommand{\indentStd}{\noindent\hspace*{10pt}}
+
+% Job title on the left, dates right-aligned
+\newcommand{\job}[2]{#1\hfill{\normalsize\mdseries #2}}
 
 
 
 \newenvironment{rubrique}[2][\linewidth]% "rubrique" prend deux arguments
 {\styleRub{#2}%       			% le second argument : titre
-\ligne{0.5mm}
+\vspace{-0.6\baselineskip}\noindent\rule{\textwidth}{0.5mm}\par\nopagebreak
 \setlength{\lenB}{#1}%		       	% Le premier argument :indentation
 \setlength{\lenC}{\linewidth}%		% Calculs...
 \addtolength{\lenC}{-\lenA}%
 \addtolength{\lenC}{-\lenB}%
 %\addtolength{\lenC}{-\parindent}%
-\addtolength{\lenC}{-19pt}
+\addtolength{\lenC}{-34pt}% indent (10pt) + 4 x tabcolsep
+\ifdim\lenB=\linewidth\addtolength{\lenB}{-22pt}\fi% single-column case
 \indentStd\begin{tabular}[t]{p{\lenB}p{\lenC}}}
 {\end{tabular}}
 
@@ -47,6 +54,13 @@
 \indentStd\begin{tabular}[t]{p{\lenB}p{\lenC}}}
 {\end{tabular}}
 
+% Breakable single-column section (the tabular-based rubrique cannot
+% split across pages, which left large gaps at page bottoms)
+\newenvironment{sectionblock}[1]
+{\styleRub{#1}\vspace{-0.6\baselineskip}\noindent\rule{\textwidth}{0.5mm}\par\nopagebreak
+\begin{list}{}{\setlength{\leftmargin}{10pt}\setlength{\topsep}{0pt}}\item\relax}
+{\end{list}}
+
 \newlength{\lenA} % indentation au début d'une ligne
 \setlength{\lenA}{0.cm}
 \newlength{\lenB} % Taille champ dates
@@ -54,25 +68,27 @@
 %\newlength{\lenD}
 
 
-\geometry{hmargin={2cm, 2cm}, vmargin={2cm, 2cm}}
+\geometry{hmargin={2cm, 2cm}, vmargin={1.8cm, 1.8cm}}
 
 \begin{document}
 
 
-\begin{tabular*}{1\textwidth}{@{\extracolsep{\fill}}lr}
-Mathieu Lacage & mathieu.lacage@cutebugs.net\\
-\end{tabular*}
-
-\vspace{1cm}
-\begin{center}{\huge Software Engineer}\end{center}
+\begin{center}
+{\LARGE\bfseries Mathieu Lacage}\\[0.3em]
+{\large Software Engineer}\\[0.3em]
+\href{mailto:mathieu.lacage@cutebugs.net}{mathieu.lacage@cutebugs.net}
+% TODO: add location, and links, e.g.
+% \ \textbullet\ \href{https://github.com/...}{github.com/...}
+% \ \textbullet\ \href{https://scholar.google.com/...}{Google Scholar}
+\end{center}
 
 \begin{center}
 Experienced Software Engineer who enjoys hands-on technical roles.\newline
 I build secure stuff that works and that scales.
 \end{center}
 
-\vspace{1cm}
-\begin{rubrique}{Technical Experience}
+\vspace{0.45cm}
+\begin{sectionblock}{Skills}
 
 Technology
 \begin{itemize}
@@ -82,15 +98,15 @@ Technology
 
 Extensive practical and theoretical knowledge of
 \begin{itemize}
-\item Networking: from Wi-Fi MAC, to IP and TCP
+\item Networking: from Wi-Fi MAC to IP and TCP
 \item Machine Learning, Transformers
-\item Event-driven discrete-time simulation
+\item Discrete-event simulation
 \end{itemize}
 
-\end{rubrique}
+\end{sectionblock}
 
-\vspace{2cm}
-\begin{rubrique}{INRIA, 2025 -- Present, Research Engineer}
+\vspace{0.45cm}
+\begin{sectionblock}{\job{Research Engineer, INRIA}{2025 -- Present}}
 
 Researching domain-specific SLMs (Small Language Models) under 1B parameters
 
@@ -106,11 +122,10 @@ Select software projects
 \item Container-based single-GPU SLM training framework for students
 \end{itemize}
 
-\end{rubrique}
-\pagebreak
+\end{sectionblock}
 
-\vspace{0.5cm}
-\begin{rubrique}{Hive, 2023 -- 2025, Architect}
+\vspace{0.45cm}
+\begin{sectionblock}{\job{Architect, Hive}{2023 -- 2025}}
 
 Scaled (100x) and improved the reliability (2x) of a Go libp2p-based application.
 
@@ -118,20 +133,20 @@ Scaled (100x) and improved the reliability (2x) of a Go libp2p-based application
 \item Metric collection, analysis, monitoring, and alerting
         spanning centralized infrastructure and a p2p network
 \item Debugged and fixed network and IO problems to scale the Hive p2p network
-\item Built python-based development, testing, and debugging tools
+\item Built Python-based development, testing, and debugging tools
 \item Planned and managed component-level testing strategies
 \item Designed forward error correction policies around dynamic
         decisions to minimize both data loss and storage use
 \end{itemize}
 
-\end{rubrique}
+\end{sectionblock}
 
-\vspace{0.5cm}
-\begin{rubrique}{Alcmeon, 2011 -- 2023, CTO, co-founder}
+\vspace{0.45cm}
+\begin{sectionblock}{\job{CTO, co-founder, Alcmeon}{2011 -- 2023}}
 
 As CTO, I 
 \begin{itemize}
-\item Made sure our customers's data stayed safe via at-rest encryption,
+\item Made sure our customers' data stayed safe via at-rest encryption
         and centralized access control
 \item Scaled our code and infrastructure to sustain
         50\% YoY volume growth with 1000\% YoY peak volume growth
@@ -150,19 +165,18 @@ As co-founder, I focused on
 
 Select projects
 \begin{itemize}
-\item Pub/Sub streaming WebSocket server that scales to 10K concurrent connections per cpu
-\item Zero-downtime scale up of a single database with a single table to partioned
+\item Pub/Sub streaming WebSocket server that scales to 10K concurrent connections per CPU
+\item Zero-downtime scale up of a single database with a single table to partitioned
  databases per customer, 250 tables, 1TB
 \item SSO integration in SSH
 \item A security policy that spans infrastructure and application-level code
 \end{itemize}
 
-\end{rubrique}
-\pagebreak
+\end{sectionblock}
 
-
-\begin{rubrique}{INRIA, 2005 -- 2011, Software Lead ns-3}
-  Built ns-3, an open-source network simulator now used in hundreds of research publications every year. 
+\vspace{0.45cm}
+\begin{sectionblock}{\job{Software Lead ns-3, INRIA}{2005 -- 2011}}
+  Built \href{https://www.nsnam.org}{ns-3}, an open-source network simulator now used in hundreds of research publications every year.
  
   \begin{itemize}
   \item Designed and implemented core APIs: object model, network packets, event scheduler
@@ -172,46 +186,44 @@ Select projects
 
   But also:
   \begin{itemize}
-  \item Recruited, and managed a local development team (5).
-  \item Relocated to the University of Washington for 10 months to initiate collaboration with US team.
+  \item Recruited and managed a local development team (5)
+  \item Relocated to the University of Washington for 10 months to initiate collaboration with US team
   \item Evangelized use of ns-3 within other research institutes via
-    presentations and seminars.
+    presentations and seminars
   \item Published 7 papers on ns-3 (4 as main author and 3 as co-author)
   \end{itemize}
 
-\end{rubrique}
+\end{sectionblock}
 
-\vspace{0.5cm}
-\begin{rubrique}{INRIA, 2003 -- 2005, Software Engineer}
+\vspace{0.45cm}
+\begin{sectionblock}{\job{Software Engineer, INRIA}{2003 -- 2005}}
 
   Designed and built software for network research teams:  
   \begin{itemize}
   \item Yans, a C++ event-driven simulator
-  \item NEPI, a python tool used to describe, deploy, and control networking
-    experiments on hundreds of hosts distributed all over the planet.
+  \item NEPI, a Python tool used to describe, deploy, and control networking
+    experiments on hundreds of hosts distributed all over the planet
   \end{itemize}
 
   Provided software mentoring to research projects involved in 
   bio-reactor chemical reaction control and medical image analysis.
 
-\end{rubrique}
+\end{sectionblock}
 
-\vspace{0.5cm}
-\begin{rubrique}{Sigma-Designs, 2001 -- 2003, Software Engineer}
+\vspace{0.45cm}
+\begin{sectionblock}{\job{Software Engineer, Sigma-Designs}{2001 -- 2003}}
 
   Implemented DVD navigation control software for the video
   decompression chips that were designed in-house and
   sold to OEMs to build consumer DVD players.
 
-\end{rubrique}
+\end{sectionblock}
 
-\vspace{0.5cm}
-\begin{rubrique} [4cm] {Education}
+\vspace{0.45cm}
+\begin{rubrique} [3cm] {Education}
   2006 -- 2010 & Ph.D. at University of Nice,
   \emph{Experimentation Tools for Networking Research}, under the supervision of Walid Dabbous\\
   1998 -- 2001 & Engineer at Telecom ParisTech (ENST), Software Engineering, Networking, Micro-Electronics \\
 \end{rubrique}
 
 \end{document}
-
-
