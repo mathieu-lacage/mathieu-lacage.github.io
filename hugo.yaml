@@ -37,6 +37,9 @@ menu:
     - identifier: library
       name: Library
       url: /library
+    - identifier: ns-3-usage
+      name: ns-3 Usage
+      url: /ns-3-usage
 #    - identifier = "make"
 #      name = "Make"
 #      url = "/make"

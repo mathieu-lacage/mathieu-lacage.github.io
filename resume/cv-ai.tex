@@ -8,7 +8,7 @@
 \renewcommand{\familydefault}{\sfdefault}
 \usepackage{latexsym}
 \usepackage{url}
-\usepackage[hidelinks]{hyperref}
+\usepackage[colorlinks, linkcolor=black]{hyperref}
 \usepackage{enumitem}
 \usepackage{needspace}
 \setlist[itemize]{itemsep=1pt,parsep=0pt,topsep=3pt}
@@ -28,6 +28,8 @@
 % Job title on the left, dates right-aligned
 \newcommand{\job}[2]{#1\hfill{\normalsize\mdseries #2}}
 
+% One-line company description under a section header
+\newcommand{\company}[1]{\textit{#1}\par\medskip}
 
 
 \newenvironment{rubrique}[2][\linewidth]% "rubrique" prend deux arguments
@@ -75,7 +77,7 @@
 
 \begin{center}
 {\LARGE\bfseries Mathieu Lacage}\\[0.3em]
-{\large Software Engineer}\\[0.3em]
+{\large Software Engineer \textperiodcentered{} Systems \& Machine Learning}\\[0.3em]
 \href{mailto:mathieu.lacage@cutebugs.net}{mathieu.lacage@cutebugs.net}
 % TODO: add location, and links, e.g.
 % \ \textbullet\ \href{https://github.com/...}{github.com/...}
@@ -83,8 +85,8 @@
 \end{center}
 
 \begin{center}
-Experienced Software Engineer who enjoys hands-on technical roles.\newline
-I build secure stuff that works and that scales.
+Hands-on engineer: creator of ns-3 (2,000+ papers/year), 12 years as CTO
+scaling a SaaS to 100M messages/day \& 4M ARR, now training small language models at INRIA.
 \end{center}
 
 \vspace{0.45cm}
@@ -92,15 +94,10 @@ I build secure stuff that works and that scales.
 
 Technology
 \begin{itemize}
-\item Languages: C, C++, Python, SQL
-\item Infrastructure tools: MySQL, Ansible, uWSGI, Prometheus, Grafana
-\end{itemize}
-
-Extensive practical and theoretical knowledge of
-\begin{itemize}
-\item Networking: from Wi-Fi MAC to IP and TCP
-\item Machine Learning, Transformers
-\item Discrete-event simulation
+\item Languages: C, C++, Python, Go, SQL
+\item Infrastructure: Podman, MySQL, Ansible, uWSGI, Prometheus, Grafana
+\item Machine learning: PyTorch
+\item Networking: InfiniBand, Wi-Fi MAC, IP, TCP
 \end{itemize}
 
 \end{sectionblock}
@@ -111,56 +108,61 @@ Extensive practical and theoretical knowledge of
 Researching domain-specific SLMs (Small Language Models) under 1B parameters
 
 \begin{itemize}
-\item Dataset selection and tokenizer adaptation
-\item Quantization and its impact on training convergence and speed
-\item Training vs inference cost tradeoffs and their impact on model architecture
+\item Domain-specific tokenizer adaptation strategies that do
+not require re-training models from scratch
+\item Dataset resampling to speed up pre-training loss convergence
+\item Training convergence stability of MoE models
 \end{itemize}
 
 Select software projects
 \begin{itemize}
-\item Interactive visualization of cost, pricing, and margin models for LLM inference
-\item Container-based single-GPU SLM training framework for students
+\item 1B GPT-2-style model with mixed-precision pretraining and SFT in PyTorch on 2$\times$H100, grid5k
+\item Roofline-based inference timing model, to create interactive
+        visualizations of cost, pricing, and margin models
+\item Podman-based single-GPU SLM training framework for students
+\item Stream training run metrics to local disk in compressed format for long-duration runs (\href{https://mlacage.gitlabpages.inria.fr/naw/latest/}{naw})
 \end{itemize}
 
 \end{sectionblock}
 
 \vspace{0.45cm}
 \begin{sectionblock}{\job{Architect, Hive}{2023 -- 2025}}
+\company{Decentralized cloud storage on top of a Go-based libp2p network}
 
-Scaled (100x) and improved the reliability (2x) of a Go libp2p-based application.
+Scaled storage capacity (100x) and maintained data availability above 99.99\%
 
 \begin{itemize}
+\item Managed the backend team (4)
 \item Metric collection, analysis, monitoring, and alerting
-        spanning centralized infrastructure and a p2p network
-\item Debugged and fixed network and IO problems to scale the Hive p2p network
+        spanning centralized infrastructure and our p2p network
+\item Debugged and fixed network and IO problems as our production load scaled
 \item Built Python-based development, testing, and debugging tools
 \item Planned and managed component-level testing strategies
 \item Designed forward error correction policies around dynamic
-        decisions to minimize both data loss and storage use
+        decisions to maximize data availability and minimize storage use
 \end{itemize}
 
 \end{sectionblock}
 
 \vspace{0.45cm}
 \begin{sectionblock}{\job{CTO, co-founder, Alcmeon}{2011 -- 2023}}
+\company{Conversational customer care solution for large enterprises, such as LVMH, SNCF, FNAC, Carrefour}
 
 As CTO, I 
 \begin{itemize}
 \item Made sure our customers' data stayed safe via at-rest encryption
         and centralized access control
-\item Scaled our code and infrastructure to sustain
-        50\% YoY volume growth with 1000\% YoY peak volume growth
-\item Recruited and led the technical team (8 years)
+\item Scaled our code and infrastructure to handle peaks
+      of 100M messages per day
+\item Built and led the engineering team from 0 to 10
 \item Mentored and directly managed the engineering manager and product
         director
 \end{itemize}
 
-
 As co-founder, I focused on
 \begin{itemize}
-\item Delivering high-quality customer support
-\item Product design to ensure we build features that grow our business
-\item Presales to help close deals with prospects
+\item Delivering same-day fixes to customer issues
+\item Building prototypes to explore new business opportunities
 \end{itemize}
 
 Select projects
@@ -168,24 +170,25 @@ Select projects
 \item Pub/Sub streaming WebSocket server that scales to 10K concurrent connections per CPU
 \item Zero-downtime scale up of a single database with a single table to partitioned
  databases per customer, 250 tables, 1TB
-\item SSO integration in SSH
+\item Centralized access control for SSH via Google SSO and SSH certificates
 \item A security policy that spans infrastructure and application-level code
+\item Metabase dashboards consolidating CRM, volume and billing data 
+      to track MRR and ARR metrics
 \end{itemize}
 
 \end{sectionblock}
 
 \vspace{0.45cm}
-\begin{sectionblock}{\job{Software Lead ns-3, INRIA}{2005 -- 2011}}
-  Built \href{https://www.nsnam.org}{ns-3}, an open-source network simulator now used in hundreds of research publications every year.
+\begin{sectionblock}{\job{Software Lead, ns-3, INRIA}{2005 -- 2011}}
+
+  Built ns-3 (\href{https://www.nsnam.org}{nsnam.org}, \href{https://gitlab.com/nsnam/ns-3-dev}{gitlab.com/nsnam/ns-3-dev}),
+  the de-facto open-source network simulator for network research used in
+        \href{https://www.cutebugs.net/ns-3-usage}{2,000+ papers/year}
  
   \begin{itemize}
   \item Designed and implemented core APIs: object model, network packets, event scheduler
   \item Implemented models for UDP/IP/ICMP, MAC/PHY Wi-Fi network protocols
   \item Integrated unmodified real-world network protocol implementations
-  \end{itemize}
-
-  But also:
-  \begin{itemize}
   \item Recruited and managed a local development team (5)
   \item Relocated to the University of Washington for 10 months to initiate collaboration with US team
   \item Evangelized use of ns-3 within other research institutes via
@@ -198,12 +201,8 @@ Select projects
 \vspace{0.45cm}
 \begin{sectionblock}{\job{Software Engineer, INRIA}{2003 -- 2005}}
 
-  Designed and built software for network research teams:  
-  \begin{itemize}
-  \item Yans, a C++ event-driven simulator
-  \item NEPI, a Python tool used to describe, deploy, and control networking
-    experiments on hundreds of hosts distributed all over the planet
-  \end{itemize}
+  Designed and built software for network research teams: event-driven simulation,
+  distributed experiment management, Linux kernel Wi-Fi drivers.
 
   Provided software mentoring to research projects involved in 
   bio-reactor chemical reaction control and medical image analysis.
@@ -212,9 +211,9 @@ Select projects
 
 \vspace{0.45cm}
 \begin{sectionblock}{\job{Software Engineer, Sigma-Designs}{2001 -- 2003}}
+\company{Video decompression chips}
 
-  Implemented DVD navigation control software for the video
-  decompression chips that were designed in-house and
+  Implemented DVD navigation control software for chips
   sold to OEMs to build consumer DVD players.
 
 \end{sectionblock}
