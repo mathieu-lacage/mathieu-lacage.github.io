@@ -5,10 +5,13 @@
 % cmbright + times were both loaded; times won, so the body was set in
 % Helvetica. This keeps that look with a single font package.
 \usepackage[scaled]{helvet}
+\usepackage{fontawesome5}
 \renewcommand{\familydefault}{\sfdefault}
 \usepackage{latexsym}
 \usepackage{url}
-\usepackage[colorlinks, linkcolor=black]{hyperref}
+\usepackage{xcolor}
+\definecolor{linkblue}{rgb}{0.1,0.2,0.5}
+\usepackage[colorlinks, urlcolor=linkblue, linkcolor=black]{hyperref}
 \usepackage{enumitem}
 \usepackage{needspace}
 \setlist[itemize]{itemsep=1pt,parsep=0pt,topsep=3pt}
@@ -78,21 +81,22 @@
 \begin{center}
 {\LARGE\bfseries Mathieu Lacage}\\[0.3em]
 {\large Software Engineer \textperiodcentered{} Systems \& Machine Learning}\\[0.3em]
-\href{mailto:mathieu.lacage@cutebugs.net}{mathieu.lacage@cutebugs.net}
-% TODO: add location, and links, e.g.
-% \ \textbullet\ \href{https://github.com/...}{github.com/...}
-% \ \textbullet\ \href{https://scholar.google.com/...}{Google Scholar}
+\faMapMarker*\ Antibes, France \quad
+\faEnvelope\ \href{mailto:mathieu.lacage@cutebugs.net}{mathieu.lacage@cutebugs.net} \quad
+\faGlobe\ \href{https://www.cutebugs.net}{cutebugs.net}\\[0.2em]
+\faGithub\ \href{https://github.com/mathieu-lacage/}{mathieu-lacage} \quad
+\faGraduationCap\ \href{https://scholar.google.com/citations?user=xqmXrq0AAAAJ}{Scholar} \quad
+\faLinkedin\ \href{https://www.linkedin.com/in/mathieulacage}{mathieulacage}
 \end{center}
 
 \begin{center}
-Hands-on engineer: creator of ns-3 (2,000+ papers/year), 12 years as CTO
+Hands-on engineer: co-created ns-3 (2,000+ papers/year), 12 years as CTO
 scaling a SaaS to 100M messages/day \& 4M ARR, now training small language models at INRIA.
 \end{center}
 
 \vspace{0.45cm}
 \begin{sectionblock}{Skills}
 
-Technology
 \begin{itemize}
 \item Languages: C, C++, Python, Go, SQL
 \item Infrastructure: Podman, MySQL, Ansible, uWSGI, Prometheus, Grafana
@@ -181,9 +185,10 @@ Select projects
 \vspace{0.45cm}
 \begin{sectionblock}{\job{Software Lead, ns-3, INRIA}{2005 -- 2011}}
 
-  Built ns-3 (\href{https://www.nsnam.org}{nsnam.org}, \href{https://gitlab.com/nsnam/ns-3-dev}{gitlab.com/nsnam/ns-3-dev}),
-  the de-facto open-source network simulator for network research used in
-        \href{https://www.cutebugs.net/ns-3-usage}{2,000+ papers/year}
+\company{\href{https://www.nsnam.org}{nsnam.org}, the de-facto open-source network simulator for network research used in
+\href{https://www.cutebugs.net/ns-3-usage}{2,000+ papers/year}}
+
+Co-led its development with the University of Washington and Georgia Tech teams.
  
   \begin{itemize}
   \item Designed and implemented core APIs: object model, network packets, event scheduler
