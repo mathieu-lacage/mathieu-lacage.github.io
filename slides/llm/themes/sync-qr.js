@@ -13,25 +13,29 @@
     #syncqr { position: fixed; inset: 0; z-index: 99; background: #05080ecc; display: flex; align-items: center; justify-content: center; }
     #syncqr .box { background: #0f1829; border: 1px solid #2a3550; border-radius: 12px; padding: 28px 34px; max-width: 420px;
                    font: 15px/1.5 'IBM Plex Sans', sans-serif; color: var(--cutebugs-ink, #e3e9f3); }
-    #syncqr h2 { margin: 0 0 10px; font: 600 22px 'IBM Plex Sans Condensed', sans-serif; color: var(--cutebugs-blue, #4aa8ff); }
+    #syncqr h2 { margin: 0 0 10px; font: 600 22px 'IBM Plex Sans Condensed', sans-serif; color: var(--cutebugs-blue, #4aa8ff); text-align: center; }
     #syncqr p { margin: 8px 0; }
-    #syncqr .qr { background: #fff; border-radius: 8px; padding: 10px; width: min(220px, 60vw); margin: 10px auto; }
+    #syncqr .qr { display: block; background: #fff; border-radius: 8px; padding: 10px; width: min(220px, 60vw); margin: 10px auto;
+                  cursor: pointer; text-decoration: none; }
     #syncqr .qr svg { display: block; width: 100%; height: auto; }
+    #syncqr .qr small { color: #05080e; }
     #syncqr .row { display: flex; align-items: center; gap: 8px; }
     #syncqr input { flex: 1; font: 500 15px 'IBM Plex Mono', monospace; color: #05080e; background: var(--cutebugs-ink, #e3e9f3);
                     border: 1px solid #2a3550; border-radius: 6px; padding: 6px 10px; }
     #syncqr .dice { font-size: 15px; padding: 6px 10px; border-radius: 6px; border: 1px solid #2a3550; background: none; color: inherit; cursor: pointer; }
-    #syncqr .small { font-size: 12px; color: var(--cutebugs-slate, #8e95a2); }
   </style>`);
 
   function showQR(suffix) {
+    const url = window.syncFollowerUrl(suffix);
+    qrel.href = url;                                     // the QR is a link to the follower view
+    qrel.title = url;
     qrel.innerHTML = '<small>loading…</small>';
     loadLib().then(() => {
       const qr = qrcode(0, 'M');                         // typeNumber 0: size from the payload
-      qr.addData(window.syncFollowerUrl(suffix));
+      qr.addData(url);
       qr.make();
       qrel.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
-    }).catch(() => { qrel.innerHTML = '<small>QR unavailable — the URL above still works</small>'; });
+    }).catch(() => { qrel.innerHTML = '<small>QR unavailable — the channel input below still works</small>'; });
   }
 
   let lib = null;
@@ -48,9 +52,8 @@
       modal.innerHTML = `
         <div class="box">
           <h2>Follow along</h2>
-          <div class="qr"></div>
+          <a class="qr" target="_blank" title="open the follower view"></a>
           <p class="row">channel <input spellcheck="false"> <button class="dice" title="new random string">↻</button></p>
-          <p class="small">Esc closes; the deck publishes to this channel until you change it.</p>
         </div>`;
       document.body.append(modal);
       input = modal.querySelector('input');

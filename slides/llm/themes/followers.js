@@ -26,7 +26,7 @@
     .fv-kw { color: var(--cutebugs-blue, #4aa8ff); } .fv-str { color: var(--cutebugs-green, #7bc86c); }
     .fv-com { color: var(--cutebugs-slate, #8e95a2); font-style: italic; } .fv-num { color: var(--cutebugs-orange, #f5a97f); }
     .fv-fn { color: var(--cutebugs-cyan, #8fc5fa); }
-    #fv-side { border-left: 1px solid #2a3550; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+    #fv-side { border-left: 1px solid #2a3550; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: auto; }
     #fv-status { font: 500 12px 'IBM Plex Mono', monospace; color: var(--cutebugs-slate, #8e95a2); }
     #fv-status b { color: var(--cutebugs-cyan, #8fc5fa); font-weight: 500; }
     #fv-cap { font-size: 17px; line-height: 1.45; background: var(--cutebugs-panel, #18233a);
@@ -35,15 +35,17 @@
                 border: 1px solid #2a3550; border-radius: 8px; padding: 10px 14px; }
     #fv-trace small { display: block; color: var(--cutebugs-slate, #8e95a2); font-size: 10px;
                       letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; }
-    /* phones (portrait or landscape): the code takes the whole width, the caption
-       and trace move below it — the follower page sizes the iframe to the window,
-       so these queries see the real device size. */
+    /* phones (portrait or landscape): the code takes the whole width and every
+       pixel of left-over height, the caption and trace move below it (an auto
+       row: they get exactly what they need — a percentage max-height on the
+       item itself is mis-resolved against the auto row by Chrome). The follower
+       page sizes the iframe to the window, so these queries see the real
+       device size. */
     @media (max-width: 820px), (max-height: 560px) {
       #followers-view { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
       #fv-code { padding: 12px 0 12px 14px; }
       .fv-code { margin: 0 14px 0 0; font-size: 12px; }
-      #fv-side { border-left: none; border-top: 1px solid #2a3550; padding: 10px 14px; gap: 8px;
-                 max-height: 45%; overflow: auto; }
+      #fv-side { border-left: none; border-top: 1px solid #2a3550; padding: 10px 14px; gap: 8px; }
       #fv-cap { font-size: 14px; padding: 10px 12px; }
       #fv-trace { font-size: 12px; padding: 8px 12px; }
     }
