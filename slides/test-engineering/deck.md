@@ -5,6 +5,11 @@ style: |
   :root {
     letter-spacing: 0
   }
+  :root:not([class~="title"]){
+    display: block !important;
+    place-content: normal !important;
+    text-align: left !important;
+  }
 paginate: true
 ---
 <!-- _class: title -->
