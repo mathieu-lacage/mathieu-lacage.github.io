@@ -67,7 +67,7 @@ slides: lens attn qkv kv
 .PHONY: all pdf www serve push zip clean lens attn qkv kv slides
 
 # Everything the decks need to run in a browser, online (push) or offline (zip)
-DECK_FILES=index.html next-word-prediction.html inference.html follower.html $(wildcard themes/*.css themes/*.js themes/*.svg) vendor/reveal/reveal.css vendor/reveal/reveal.js vendor/reveal/notes.js vendor/mathjax/tex-svg-full.js
+DECK_FILES=index.html next-word-prediction.html inference.html follower.html $(wildcard themes/*.css themes/*.js themes/*.svg) vendor/reveal/reveal.css vendor/reveal/reveal.js vendor/reveal/notes.js vendor/mathjax/tex-svg-full.js vendor/qrcode.min.js
 
 push: $(DECK_FILES)
 	rsync -avzR $^ mlacage@srv-sophia.inria.fr:/net/servers/www-sop/members/Mathieu.Lacage/slides/llm
