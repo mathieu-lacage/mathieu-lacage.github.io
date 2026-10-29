@@ -12,10 +12,10 @@ html: deck.html
 pdf: deck.pdf
 
 deck.html: deck.md $(THEMES)
-	$(MARP) --html $< -o $@
+	$(MARP) --html --theme themes/inria.css $< -o $@
 
 deck.pdf: deck.md $(THEMES)
-	$(MARP) --allow-local-files --html $< -o $@
+	$(MARP) --allow-local-files --html --theme themes/inria.css $< -o $@
 
 index.html: deck.html
 	cp $^ $@
