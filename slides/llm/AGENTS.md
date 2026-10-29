@@ -7,7 +7,7 @@ A set of course decks on LLMs: static HTML files using reveal.js and MathJax
 ## Editing slides
 
 Decks are hand-edited HTML: `index.html` (landing page), `next-word-prediction.html`,
-`llm-inference.html`, and the standalone `deck.html`. A `<section>` is one slide.
+`inference.html`, and the standalone `deck.html`. A `<section>` is one slide.
 Each deck copies the same `<head>` and footer pattern; keep new slides consistent
 with it (same class conventions, `themes/*.css` per topic area).
 

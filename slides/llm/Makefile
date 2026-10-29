@@ -64,16 +64,21 @@ kv:
 
 slides: lens attn qkv kv
 
-.PHONY: all pdf serve push zip clean lens attn qkv kv slides
+.PHONY: all pdf www serve push zip clean lens attn qkv kv slides
 
 # Everything the decks need to run in a browser, online (push) or offline (zip)
-DECK_FILES=index.html next-word-prediction.html llm-inference.html $(wildcard themes/*.css themes/*.js themes/*.svg) vendor/reveal/reveal.css vendor/reveal/reveal.js vendor/reveal/notes.js vendor/mathjax/tex-svg-full.js
+DECK_FILES=index.html next-word-prediction.html inference.html follower.html $(wildcard themes/*.css themes/*.js themes/*.svg) vendor/reveal/reveal.css vendor/reveal/reveal.js vendor/reveal/notes.js vendor/mathjax/tex-svg-full.js
 
-push: $(DECK_FILES) .htaccess themes/.htaccess
+push: $(DECK_FILES)
 	rsync -avzR $^ mlacage@srv-sophia.inria.fr:/net/servers/www-sop/members/Mathieu.Lacage/slides/llm
 
 # The same files in llm/, to unzip and open llm/index.html without a server
 zip: llm.zip
+
+# Copy the deck into the Hugo static dir, served at /slides/llm/ (CI: slides Makefile)
+www: $(DECK_FILES)
+	rm -rf ../../static/slides/llm && mkdir -p ../../static/slides/llm
+	cp --parents $^ ../../static/slides/llm/
 
 llm.zip: $(DECK_FILES)
 	rm -rf $@ zip.tmp && mkdir -p zip.tmp/llm
