@@ -1,0 +1,45 @@
+/* Next-word animation (themes/nextword.js): a prompt, then one distribution of the
+   next word per generated word, stacked on each other. On every step nextword.js
+   toggles .is-grown (bars drawn), .is-on (shown) and .is-picked (first word
+   highlighted) on each distribution, and .is-on on each appended word. */
+.nw { display: flex; flex-direction: column; gap: 22px; }
+.nw-prompt {
+  font-size: 42px; line-height: 1.3; padding: 14px 24px;
+  background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-blue);
+  white-space: nowrap;
+}
+.nw-new {
+  display: inline-block; vertical-align: bottom; overflow: hidden;
+  max-width: 0; opacity: 0; color: var(--cutebugs-red-dark); font-weight: bold;
+  transition: max-width .6s ease, opacity .6s ease .2s;
+}
+.nw-new.is-on { max-width: 6em; opacity: 1; }
+.nw-cursor { color: var(--cutebugs-slate); margin-left: 4px; animation: nw-blink 1s steps(1) infinite; }
+@keyframes nw-blink { 50% { opacity: 0; } }
+
+.nw-dists { display: grid; }
+.nw-dist {
+  grid-area: 1 / 1; display: grid; row-gap: 6px;
+  grid-template-columns: 210px 560px auto; column-gap: 18px; align-items: center;
+  font-size: 26px; opacity: 0; visibility: hidden; transition: opacity .5s ease, visibility .5s;
+}
+.nw-dist.is-on { opacity: 1; visibility: visible; }
+.nw-cap { grid-column: 1 / -1; font-size: 22px; color: var(--cutebugs-slate); margin-bottom: 4px; }
+.nw-row { display: contents; }
+.nw-row > * { transition: opacity .4s ease; }
+.nw-w { text-align: right; white-space: nowrap; }
+.nw-pct { color: var(--cutebugs-slate); font-variant-numeric: tabular-nums; }
+
+/* the bars grow, one row after the other, when their distribution first shows */
+.nw-bar {
+  height: 26px; width: calc(var(--p) * 1%); background: var(--cutebugs-blue);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform .7s ease calc(var(--i) * .08s), background-color .4s ease;
+}
+.nw-dist.is-grown .nw-bar { transform: none; }
+.nw-bar.nw-rest { background: repeating-linear-gradient(90deg, var(--cutebugs-dim) 0 6px, transparent 6px 10px); }
+
+/* picked: the first word in the highlight colour, the others dimmed */
+.nw-dist.is-picked .nw-row:not(.nw-pick) > * { opacity: .3; }
+.nw-dist.is-picked .nw-pick .nw-bar { background: var(--cutebugs-red); }
+.nw-dist.is-picked .nw-pick .nw-w { color: var(--cutebugs-red-dark); font-weight: bold; }

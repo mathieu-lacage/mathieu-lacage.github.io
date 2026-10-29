@@ -1,0 +1,1158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Inference</title>
+<link rel="stylesheet" href="vendor/reveal/reveal.css">
+<link rel="stylesheet" href="themes/cutebugs.css">
+<link rel="stylesheet" href="themes/decoding.css">
+<link rel="stylesheet" href="themes/nextword.css">
+<link rel="stylesheet" href="themes/linalg.css">
+<link rel="stylesheet" href="themes/ffn.css">
+<link rel="stylesheet" href="themes/kvcache.css">
+<link rel="stylesheet" href="themes/prefill.css">
+<link rel="stylesheet" href="themes/cost.css">
+<link rel="stylesheet" href="themes/flash.css">
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+  svg: { fontCache: 'local' },  // local: themes/linalg.js typesets with tex2svg after startup
+};
+</script>
+<script src="vendor/mathjax/tex-svg-full.js" defer></script>
+<script src="themes/steps.js"></script>
+<script src="themes/viz-core.js"></script>
+<script src="themes/braces.js"></script>
+</head>
+<body data-overview="sections">
+<!-- copied into every slide by themes/deck.js -->
+<footer id="footer" hidden>LLM Inference — 2026-10-08 — <a href="mailto:mathieu.lacage@inria.fr">mathieu.lacage@inria.fr</a></footer>
+<div class="reveal">
+<div class="slides">
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>LLM Inference</h1>
+</section>
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>Linear Algebra refresher</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Matrix × matrix</h1>
+
+<div class="la" data-la="matmul">
+<p>A matrix is a grid of numbers. <strong>A</strong> has <strong>n = 2</strong> rows and <strong>k = 3</strong> columns: shape <strong>(n, k) = (2, 3)</strong></p>
+<p>$C = A\,B$: each row of A meets each column of B at the cell they produce</p>
+<p><strong>$c_{11}$ = row 1 of A · column 1 of B</strong> = 4</p>
+<p>$c_{12}$ = row 1 · column 2</p>
+<p>Any cell: <strong>$c_{ij}$ = row i of A · column j of B</strong></p>
+<p>8 cells, 8 dot products of size 3</p>
+<p><strong>(n, k) · (k, m) → (n, m)</strong>: n · m · k = 24 multiply-adds</p>
+</div>
+
+<aside class="notes" data-markdown>
+Cross layout, used again on the attention slides: A to the left of C, B above it, so row i of A and column j of B meet at c_ij.
+
+The cost n · m · k is the number the performance part keeps coming back to.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Matrix × vector</h1>
+
+<div class="la" data-la="matvec">
+<p>A vector is a matrix with one column: <strong>x is (k, 1)</strong>, so this is $C = A\,B$ with <strong>m = 1</strong></p>
+<p>$y_1 = \sum_{l=1}^{4} a_{1l}\, x_l = 1 \cdot 2 + 0 \cdot 1 + 2 \cdot (-1) + (-1) \cdot 1 = \color{#f5c451}{-1}$</p>
+<p>$y_2 = \sum_{l=1}^{4} a_{2l}\, x_l = 0 \cdot 2 + 1 \cdot 1 + 1 \cdot (-1) + 2 \cdot 1 = \color{#f5c451}{2}$</p>
+<p>$y_3 = \sum_{l=1}^{4} a_{3l}\, x_l = 3 \cdot 2 + (-1) \cdot 1 + 0 \cdot (-1) + 1 \cdot 1 = \color{#f5c451}{6}$</p>
+</div>
+
+<aside class="notes" data-markdown>
+Same layout, m = 1. Each output is a dot product: this is what q = x W_Q does for every coordinate of q.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Transpose</h1>
+
+<div class="la" data-la="transpose">
+<p>A column vector a, shape <strong>(d, 1) = (4, 1)</strong></p>
+<p>Transpose: the column becomes a row. <strong>$a^\top$</strong> has shape <strong>(1, 4)</strong></p>
+<p><strong>$a^\top b$</strong>: (1, 4) · (4, 1) → (1, 1). One row times one column is the dot product: <strong>$a^\top b = a \cdot b = 6$</strong></p>
+<p>For a matrix, entry (i, j) moves to (j, i). <strong>$M^\top$</strong>: (2, 3) → (3, 2)</p>
+</div>
+<script src="themes/linalg.js"></script>
+
+<aside class="notes" data-markdown>
+The « Matrix version » slide uses Kᵀ: one column per token.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>The attention black box</h1>
+</section>
+
+
+<!-- ================================================================ -->
+<section>
+<h1>Attention, one head, one token</h1>
+
+<style>
+/* the score and attention rows hold fractions: taller rows */
+section .eqfrac tbody tr:is(:nth-child(4), :nth-child(5)) > td { height: 64px; }
+/* « ⋯ » stands for ␣city ␣of: a narrow, dim column */
+section .eqfrac :is(td, th):nth-child(3) { color: var(--cutebugs-dim); width: 40px; }
+</style>
+
+<div class="eqgrid eqfrac" data-fixed="1" data-colors="slate blue magenta red red green green red">
+<table>
+<thead>
+<tr><th><strong>token</strong><br>one column per position</th><th>The</th><th>⋯</th><th>␣Paris</th><th>␣is</th><th>␣the</th><th>␣capital</th><th>␣of</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>input</strong><br>what the model knows</td><td>$x_1$</td><td>⋯</td><td>$x_4$</td><td>$x_5$</td><td>$x_6$</td><td>$x_7$</td><td>$x_8$</td></tr>
+<tr><td><strong>query</strong><br>only the last token asks</td><td>·</td><td>⋯</td><td>·</td><td>·</td><td>·</td><td>·</td><td>$q_8 = x_8 W_Q$</td></tr>
+<tr><td><strong>key</strong><br>every token answers</td><td>$k_1 = x_1 W_K$</td><td>⋯</td><td>$k_4 = x_4 W_K$</td><td>$k_5 = x_5 W_K$</td><td>$k_6 = x_6 W_K$</td><td>$k_7 = x_7 W_K$</td><td>$k_8 = x_8 W_K$</td></tr>
+<tr><td><strong>score</strong><br>how well each key answers</td><td>$s_1 = \dfrac{q_8 \cdot k_1}{\sqrt{d_h}}$</td><td>⋯</td><td>$s_4 = \dfrac{q_8 \cdot k_4}{\sqrt{d_h}}$</td><td>$s_5 = \dfrac{q_8 \cdot k_5}{\sqrt{d_h}}$</td><td>$s_6 = \dfrac{q_8 \cdot k_6}{\sqrt{d_h}}$</td><td>$s_7 = \dfrac{q_8 \cdot k_7}{\sqrt{d_h}}$</td><td>$s_8 = \dfrac{q_8 \cdot k_8}{\sqrt{d_h}}$</td></tr>
+<tr><td><strong>attention</strong><br>weights that sum to 1</td><td>$a_1 = \dfrac{e^{s_1}}{\sum\nolimits_i e^{s_i}}$</td><td>⋯</td><td>$a_4 = \dfrac{e^{s_4}}{\sum\nolimits_i e^{s_i}}$</td><td>$a_5 = \dfrac{e^{s_5}}{\sum\nolimits_i e^{s_i}}$</td><td>$a_6 = \dfrac{e^{s_6}}{\sum\nolimits_i e^{s_i}}$</td><td>$a_7 = \dfrac{e^{s_7}}{\sum\nolimits_i e^{s_i}}$</td><td>$a_8 = \dfrac{e^{s_8}}{\sum\nolimits_i e^{s_i}}$</td></tr>
+<tr><td><strong>value</strong><br>what each token offers</td><td>$v_1 = x_1 W_V$</td><td>⋯</td><td>$v_4 = x_4 W_V$</td><td>$v_5 = x_5 W_V$</td><td>$v_6 = x_6 W_V$</td><td>$v_7 = x_7 W_V$</td><td>$v_8 = x_8 W_V$</td></tr>
+<tr><td><strong>weighted value</strong><br>value × attention</td><td>$z_1 = a_1 v_1$</td><td>⋯</td><td>$z_4 = a_4 v_4$</td><td>$z_5 = a_5 v_5$</td><td>$z_6 = a_6 v_6$</td><td>$z_7 = a_7 v_7$</td><td>$z_8 = a_8 v_8$</td></tr>
+<tr><td><strong>update</strong><br>the sum is added to « of »</td><td>$x_8 \mathrel{+}= (z_1 + z_2 + z_3 + z_4 + z_5 + z_6 + z_7 + z_8)\, W_O$ → <strong>France</strong></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+</table>
+</div>
+<script src="themes/eqgrid.js"></script>
+
+<aside class="notes" data-markdown>
+Here, we want to show the simple per-token per-head equations. We pick token position "of"
+and show how it is built from transformed versions of the vectors for the previous positions
+
+In the next slide, we generalize and show how this can be expressed as matrix
+operations
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Attention, one head</h1>
+
+<div class="eqgrid eqpair" data-fixed="0" data-step-cols="2" data-query="none" data-colors="blue magenta green slate red red">
+<table>
+<thead>
+<tr><th></th><th>one token (previous slide)</th><th></th><th>all tokens at once</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>query</strong></td><td>$q_n = x_n\,W_{\color{#4aa8ff}Q}$</td><td>⟶</td><td>${\color{#4aa8ff}Q} = {\color{#8e95a2}X}\,W_{\color{#4aa8ff}Q}$<span class="eqpair-sz">stack the n rows · n × d<sub>h</sub></span></td></tr>
+<tr><td><strong>key</strong></td><td>$k_j = x_j\,W_{\color{#d97fd0}K}$</td><td>⟶</td><td>${\color{#d97fd0}K} = {\color{#8e95a2}X}\,W_{\color{#d97fd0}K}$<span class="eqpair-sz">n × d<sub>h</sub></span></td></tr>
+<tr><td><strong>value</strong></td><td>$v_j = x_j\,W_{\color{#7cc47a}V}$</td><td>⟶</td><td>${\color{#7cc47a}V} = {\color{#8e95a2}X}\,W_{\color{#7cc47a}V}$<span class="eqpair-sz">n × d<sub>h</sub></span></td></tr>
+<tr><td><strong>mask</strong></td><td>$j \le n$: only itself and earlier tokens</td><td>⟶</td><td>$M_{i j} = 0 \text{ if } j \le i,\ {-\infty} \text{ if } j &gt; i$<span class="eqpair-sz">n × n · softmax turns −∞ into 0</span></td></tr>
+<tr><td><strong>mix</strong></td><td>$z_n = \sum_{j \le n} \mathrm{softmax}_j\!\left(\frac{q_n \cdot k_j}{\sqrt{d_h}}\right) v_j$</td><td>⟶</td><td>${\color{#7cc47a}Z} = \mathrm{softmax}\!\left(\frac{{\color{#4aa8ff}Q}\,{\color{#d97fd0}K}^{\mathsf T}}{\sqrt{d_h}} + M\right){\color{#7cc47a}V}$<span class="eqpair-sz">n × d<sub>h</sub> · the dot products become one product</span></td></tr>
+<tr><td><strong>update</strong></td><td>$x_n \mathrel{+}= z_n\,W_O$</td><td>⟶</td><td>${\color{#f5c451}Y} = {\color{#8e95a2}X} + {\color{#7cc47a}Z}\,W_O$<span class="eqpair-sz">n × d · the residual add, for every row</span></td></tr>
+</tbody>
+</table>
+</div>
+<script src="themes/eqgrid.js"></script>
+
+<aside class="notes" data-markdown>
+The same equations as the previous slide, for every token at once: stack the
+n rows x_j into X and every per-token product becomes one matrix product.
+The mask keeps each token from reading later tokens (j ≤ i), which the
+per-token sum did by stopping at n.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Matrix version</h1>
+
+<div class="viz" data-anim="attention" data-tokens="Paris ␣is ␣the ␣capital" data-scores="2.10 0.60 0.60 1.85">
+<p>Input: <strong>x</strong>, n rows of d numbers, one row per token</p>
+<p><strong>Query</strong>: Q = x · W<sub>Q</sub>; we follow its last row, q<sub>4</sub> (« capital »)</p>
+<p><strong>Key</strong>: K = x · W<sub>K</sub>, the same x with another weight matrix</p>
+<p><strong>Transpose</strong>: K<sup>T</sup> has one column per token</p>
+<p>q<sub>4</sub> · k<sub>1</sub>: row 4 of Q times column 1 of K<sup>T</sup></p>
+<p>q<sub>4</sub> · k<sub>2</sub>: same row of Q, next column of K<sup>T</sup></p>
+<p>q<sub>4</sub> · k<sub>3</sub></p>
+<p>q<sub>4</sub> · k<sub>4</sub>: the last token sees every token, itself included</p>
+<p><strong>Softmax</strong> on row 4: the 4 scores become weights that sum to 1</p>
+<p><strong>Value</strong>: V = x · W<sub>V</sub></p>
+<p><strong>Mix</strong>: z<sub>4</sub> = 0.45 v<sub>1</sub> + 0.10 v<sub>2</sub> + 0.10 v<sub>3</sub> + 0.35 v<sub>4</sub>, row 4 of A times V</p>
+<p>Rows 1 to 3: same steps, all at once; row i only sees rows ≤ i</p>
+<p><strong>Output</strong>: O = Z · W<sub>O</sub>, back to n × d</p>
+</div>
+<script src="themes/attention.js"></script>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Multi-Head Attention</h1>
+
+<div class="viz" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4">
+<p>A layer runs <strong>H heads</strong> side by side, here H = 4. Input <strong>x</strong>: n × d, with d = H · d<sub>h</sub></p>
+<p>One product computes Q, K and V: x · [W<sub>Q</sub> | W<sub>K</sub> | W<sub>V</sub>], each W is d × d</p>
+<p>Head 1 only uses its <strong>column slice</strong> of each W: d × d<sub>h</sub>, as on the previous slide</p>
+<p>Regroup the slices <strong>by head</strong>: head h owns Q<sub>h</sub>, K<sub>h</sub>, V<sub>h</sub>, n × d<sub>h</sub>; the same x feeds them all</p>
+<p>Each head computes its own <strong>attention</strong> A<sub>h</sub> = softmax(Q<sub>h</sub> K<sub>h</sub><sup>T</sup> / √d<sub>h</sub> + M): each looks elsewhere</p>
+<p>Z<sub>h</sub> = A<sub>h</sub> · V<sub>h</sub>, n × d<sub>h</sub>: A<sub>h</sub> to the left, V<sub>h</sub> above, as on the previous slide</p>
+<p>Side by side, the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
+<p>W<sub>O</sub> is d × d, cut into H <strong>row slices</strong> of d<sub>h</sub> rows</p>
+<p>Head 1 adds Z<sub>1</sub> · W<sub>O</sub><sup>(1)</sup>, n × d, to O</p>
+<p>Head 2 adds Z<sub>2</sub> · W<sub>O</sub><sup>(2)</sup></p>
+<p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
+<p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>: <strong>O</strong> = Σ<sub>h</sub> Z<sub>h</sub> · W<sub>O</sub><sup>(h)</sup> = Z · W<sub>O</sub>, n × d</p>
+</div>
+<script src="themes/heads.js"></script>
+</section>
+
+<!-- ================================================================ -->
+<section class="takeaway">
+<h2>Key takeaways</h2>
+<h1>Attention</h1>
+<ul>
+<li>Is causal in decoder architectures</li>
+<li>Processes all past tokens and all dimensions to generate each output token</li>
+</ul>
+
+</section>
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>The FFN black box</h1>
+</section>
+
+
+<!-- ================================================================ -->
+<section>
+<h1>Up and then Down</h1>
+
+<div class="ffn" data-ffn="blocks">
+<p>Input: n rows of <strong>d = 2 048</strong> numbers, one row per token</p>
+<p><strong>Up</strong>, then SiLU: each row becomes <strong>3× wider</strong>, d<sub>ff</sub> = 6 144 numbers</p>
+<p>« Paris » goes through Up: its own row of <strong>6 144</strong> numbers</p>
+<p>« is »: the same weights, its own row. It never sees « Paris »</p>
+<p>« the »: its own row</p>
+<p>« capital »: 4 rows in, 4 rows out. <strong>Rows never interact</strong></p>
+<p><strong>Down</strong>: back to d = 2 048 numbers per row</p>
+<p>Row 1 of the wide vector gives row 1 of the output</p>
+<p>Row 2 gives row 2</p>
+<p>Row 3 gives row 3</p>
+<p>Row 4 gives row 4: <strong>the same processing for every row</strong></p>
+<p>Weights: Up is d × d<sub>ff</sub>, Down is d<sub>ff</sub> × d: <strong>2 × 12.6 M</strong> per layer</p>
+</div>
+
+<aside class="notes" data-markdown>
+The FFN block of « The Transformer black box », opened: Up, then Down. Cell widths are to
+scale: the intermediate vector is 3× wider than x. The darker cells of the wide vector are
+the values SiLU pushes near 0.
+
+Simplified: Llama's FFN also has a gate (SwiGLU), on the next slide.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Up is gated</h1>
+
+<div class="ffn" data-ffn="gated">
+<p>Input: n rows of <strong>d = 2 048</strong> numbers, one row per token</p>
+<p>Two blocks read the same x: <strong>Gate</strong> and <strong>Up</strong>. Each one outputs a vector of d<sub>ff</sub> = 6 144 numbers</p>
+<p>« Paris »: Gate outputs a <strong>gate vector</strong>, mostly near 0 after SiLU. Up outputs an <strong>up vector</strong></p>
+<p>Element 1: h<sub>1</sub> = gate<sub>1</sub> × up<sub>1</sub>. The gate is <strong>open</strong>: h<sub>1</sub> follows up<sub>1</sub></p>
+<p>Element 2: h<sub>2</sub> = gate<sub>2</sub> × up<sub>2</sub>. The gate is <strong>closed</strong> (≈ 0): h<sub>2</sub> ≈ 0</p>
+<p>And so on for every element, <strong>each one on its own</strong>: 6 144 multiplications</p>
+<p>« is »: its own gate and up vectors, combined the same way</p>
+<p>« the »</p>
+<p>« capital »: 4 rows in, 4 rows out. <strong>Rows never interact</strong></p>
+<p><strong>Down</strong>: back to d = 2 048 numbers per row</p>
+<p>Row 1 of the wide vector gives row 1 of the output</p>
+<p>Row 2 gives row 2</p>
+<p>Row 3 gives row 3</p>
+<p>Row 4 gives row 4: <strong>the same processing for every row</strong></p>
+<p>Weights: Gate and Up are d × d<sub>ff</sub> each, Down d<sub>ff</sub> × d: <strong>37.7 M</strong> per layer</p>
+</div>
+
+<aside class="notes" data-markdown>
+What Qwen (and Llama, Mistral, DeepSeek…) actually compute: SwiGLU.
+Gate on top, the result h in the middle, Up at the bottom, all in the same columns:
+column j of gate and column j of up give column j of h. The gate is drawn after SiLU,
+so the dark cells of h are exactly where the gate is closed.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Matrix notation is compact</h1>
+
+<div class="eqgrid eqpair ffneq" data-fixed="1" data-query="none" data-colors="slate blue magenta red green slate">
+<table>
+<thead>
+<tr><th></th><th>one element, one token</th><th></th><th>one token</th><th></th><th>all tokens at once</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>input</strong></td><td>$x_{ik}$, $k = 1 \ldots d$</td><td>⟶</td><td>$x_i$, $1 \times d$</td><td>⟶</td><td>$X$<span class="eqpair-sz">n × d · one row per token</span></td></tr>
+<tr><td><strong>gate</strong></td><td>$g_{ij} = \sum_k x_{ik}\, W^{\mathrm{gate}}_{kj}$</td><td>⟶</td><td>$g = x_i\, W_{\mathrm{gate}}$</td><td>⟶</td><td>$G = X\, W_{\mathrm{gate}}$<span class="eqpair-sz">n × d<sub>ff</sub> · d<sub>ff</sub> = 6 144 = 3 d</span></td></tr>
+<tr><td><strong>up</strong></td><td>$u_{ij} = \sum_k x_{ik}\, W^{\mathrm{up}}_{kj}$</td><td>⟶</td><td>$u = x_i\, W_{\mathrm{up}}$</td><td>⟶</td><td>$U = X\, W_{\mathrm{up}}$<span class="eqpair-sz">n × d<sub>ff</sub></span></td></tr>
+<tr><td><strong>activation</strong></td><td>$h_{ij} = \mathrm{SiLU}(g_{ij})\, u_{ij}$</td><td>⟶</td><td>$h = \mathrm{SiLU}(g) \odot u$</td><td>⟶</td><td>$H = \mathrm{SiLU}(G) \odot U$<span class="eqpair-sz">n × d<sub>ff</sub> · elementwise</span></td></tr>
+<tr><td><strong>update</strong></td><td>$y_{ik} = x_{ik} + \sum_j h_{ij}\, W^{\mathrm{down}}_{jk}$</td><td>⟶</td><td>$x_i \mathrel{+}= h\, W_{\mathrm{down}}$</td><td>⟶</td><td>$Y = X + H\, W_{\mathrm{down}}$<span class="eqpair-sz">n × d · the residual add, for every row</span></td></tr>
+<tr><td><strong>why SiLU</strong></td><td>$x\, W_{\mathrm{up}} W_{\mathrm{down}} = x\, (W_{\mathrm{up}} W_{\mathrm{down}})$, a single $d \times d$ matrix<span class="eqpair-sz">two linear maps are one linear map</span></td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+</table>
+</div>
+<script src="themes/eqgrid.js"></script>
+
+<aside class="notes" data-markdown>
+Same equations three times: one element j of one token i (the sums over k and j are the
+matrix products written out), one token, then every token at once.
+
+Row i of the output only reads row i of the input: no mask, no softmax over tokens.
+
+Without SiLU, W_up W_down would collapse into one d × d matrix: the nonlinearity is what
+makes 6 144 separate rules.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>A visual representation of the matrix version</h1>
+
+<div class="ffn" data-ffn="matrix">
+<p>Input: <strong>X</strong>, n rows of d numbers, one row per token</p>
+<p>One product computes gate and up: X · [W<sub>gate</sub> | W<sub>up</sub>], each d × d<sub>ff</sub></p>
+<p>Row 4 (« capital ») of X times every column: row 4 of G and U. <strong>Only row 4 of X is read</strong></p>
+<p>SiLU(G) ⊙ U: <strong>H</strong>, n × d<sub>ff</sub>, 3× wider than X: 6 144 neurons per token</p>
+<p>H · W<sub>down</sub>: back to n × d. Row 4 of H only builds row 4 of the output</p>
+<p>Plus the residual X: <strong>Y</strong></p>
+</div>
+<script src="themes/ffn.js"></script>
+
+<aside class="notes" data-markdown>
+Same cross layout as the attention « Matrix version » and the refresher's matrix × matrix:
+A left, B above, C below B. u = 1 cell, d = 8, d_ff = 24.
+
+Numbers: 3 × 2 048 × 6 144 = 37.7 M; attention 2 048 × (2 048 + 1 024 + 1 024) + 2 048 × 2 048
+= 12.6 M (8 KV heads). The FFN dominates weights and, for short contexts, FLOPs:
+attention's score and mix FLOPs grow with n, the FFN's do not.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section class="takeaway">
+<h2>Key takeaways</h2>
+<h1>FFNs</h1>
+<ul>
+<li>Process input token-wise</li>
+<li>Are non-linear because of gating</li>
+</ul>
+
+</section>
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>Example models</h1>
+</section>
+
+
+<!-- ================================================================ -->
+<section>
+<h1>Parameters</h1>
+
+<div class="eqgrid params params-shape" data-fixed="7" data-query="none" data-colors="cyan slate slate magenta blue blue cyan">
+<table>
+<thead>
+<tr><th></th><th></th><th>Llama-2-7B</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>V</strong></td><td>vocabulary: tokens the model knows</td><td>32 000</td></tr>
+<tr><td><strong>d</strong></td><td>numbers per token vector</td><td>4 096</td></tr>
+<tr><td><strong>L</strong></td><td>layers (blocks)</td><td>32</td></tr>
+<tr><td><strong>d<sub>ff</sub></strong></td><td>FFN width</td><td>11 008 <span class="params-sz">≈ 2.7 d</span></td></tr>
+<tr><td><strong>n<sub>h</sub></strong></td><td>heads</td><td>32</td></tr>
+<tr><td><strong>d<sub>h</sub></strong></td><td>numbers per head</td><td>128 <span class="params-sz">n<sub>h</sub> · d<sub>h</sub> = d</span></td></tr>
+<tr><td><strong>tied</strong></td><td>unembedding reuses the embedding</td><td>no</td></tr>
+</tbody>
+</table>
+</div>
+<script src="themes/eqgrid.js"></script>
+
+<aside class="notes" data-markdown>
+Everything the parameter count needs, from config.json: vocab_size, hidden_size,
+num_hidden_layers, intermediate_size, num_attention_heads (= num_key_value_heads), head_dim,
+tie_word_embeddings.
+
+n_h heads, each with its own query, key and value: n_h · d_h = d.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Weights by block type</h1>
+
+<div class="eqgrid params params-count" data-fixed="0" data-query="none" data-colors="cyan blue magenta slate red">
+<table>
+<thead>
+<tr><th></th><th>count</th><th>Llama-2-7B</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>embedding</strong><br>W<sub>E</sub>, and W<sub>U</sub> if not tied</td><td>$V \cdot d$ <span class="params-sz">× 2 if not tied</span></td><td>262 M · 4 %</td></tr>
+<tr><td><strong>attention</strong><br>W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub>, W<sub>O</sub></td><td>$L \cdot 4 \cdot d \cdot n_h d_h$</td><td>2 147 M · 32 %</td></tr>
+<tr><td><strong>FFN</strong><br>W<sub>gate</sub>, W<sub>up</sub>, W<sub>down</sub></td><td>$L \cdot 3 \cdot d \cdot d_{ff}$</td><td>4 329 M · 64 %</td></tr>
+<tr><td><strong>norms</strong><br>RMSNorm scales</td><td>$L \cdot 2 \cdot d + d$</td><td>0.3 M · 0.004 %</td></tr>
+<tr><td><strong>total</strong></td><td></td><td><strong>6 738 M</strong></td></tr>
+</tbody>
+</table>
+</div>
+<script src="themes/eqgrid.js"></script>
+
+<aside class="notes" data-markdown>
+Attention: W_Q, W_K, W_V and W_O are d × n_h·d_h each (n_h · d_h = d). No biases.
+
+Norms: two per layer plus the final one.
+
+The FFN is the bulk: 2× attention. The embedding is a small share (4 %, W_E and W_U, untied).
+The next slide makes the FFN sparse.
+
+Check: Llama-2-7B is 6.74 B.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section class="takeaway">
+<h2>Key takeaways</h2>
+<ul>
+<li>FFNs represent $\frac{2}{3}$ of all parameters</li>
+<li>Attention represents $\frac{1}{3}$ of all parameters</li>
+</ul>
+
+</section>
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>Prefill, Decode, and the KVCache</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Auto-regressive decoding repeats itself</h1>
+
+<div class="kv" data-kv="decode">
+<p>Pass 1, as on « Next-token probability », with the real numbers of Qwen3-1.7B</p>
+<p>Only the <strong>last row</strong> gives a new token. Rows 1–3 predict tokens we already have</p>
+<p><strong>Append</strong> « ␣of » to the text: n = 5, and start again</p>
+<p><strong>Tokenize</strong>: the same ids, plus 315</p>
+<p><strong>Embed</strong>: rows 1–4 of x, the same numbers as in pass 1</p>
+<p><strong>Block 1</strong>: rows 1–4 of h<sub>1</sub>, the same again</p>
+<p><strong>Blocks 2 to L</strong>: rows 1–4 of h<sub>L</sub>, the same</p>
+<p><strong>Unembed</strong>: the same scores for rows 1–4</p>
+<p><strong>Argmax</strong> of the last row: « ␣France »</p>
+<p>Rows 1–4: <strong>computed again, to the bit</strong>. Only row 5 is new</p>
+<p>Pass 2 <strong>moves up</strong>: it is now the pass to compare with</p>
+<p><strong>Append</strong> « ␣France »: n = 6, and start again</p>
+<p><strong>Tokenize</strong>: the same ids, plus 9625</p>
+<p><strong>Embed</strong>: rows 1–5, the same</p>
+<p><strong>Block 1</strong>: the same</p>
+<p><strong>Blocks 2 to L</strong>: the same</p>
+<p><strong>Unembed</strong>: the same</p>
+<p><strong>Argmax</strong> of the last row: « . »</p>
+<p>Pass 3: <strong>5 rows of 6</strong> computed again</p>
+</div>
+
+<aside class="notes" data-markdown>
+The strip of « Next-token probability from Transformer stacks », once per pass, with the
+real values of Qwen3-1.7B in fp32 (tools/kv_passes.py, themes/kvpasses.js): the first 3
+numbers of x, h_1 and h_L, the top score and its token. Rows already computed in the
+previous pass differ by exactly 0.0, on every number of every block.
+
+The ids are Qwen's (Paris = 59604), not those of the decoding slide.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Why rows 1–4 do not change</h1>
+
+<div class="kv" data-kv="why">
+<p>One block: attention, then FFN. Pass 2: rows 1–4 are the inputs of pass 1, row 5 is new</p>
+<p><strong>Attention</strong>: row i reads rows 1 to i. The new row 5 is read by row 5 only</p>
+<p>Rows 1–4 read the same rows as in pass 1: <strong>same output</strong></p>
+<p><strong>FFN</strong>: row i reads row i only. Same input, <strong>same output</strong></p>
+<p>The output of block 1 is the input of block 2: <strong>the same argument, up to block L</strong></p>
+</div>
+
+<aside class="notes" data-markdown>
+« The Transformer black box » at n = 5, with its dependencies: attention fans in from rows
+1 … i (causal mask), the FFN goes straight across. Row 5 is only read by row 5, so rows
+1–4 come out as in pass 1, block after block.
+</aside>
+<script src="themes/kvpasses.js"></script>
+<script src="themes/kvcache.js"></script>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>What « of » reads from the past</h1>
+
+<div class="kvtrace">
+<div class="eqgrid" data-fixed="8" data-colors="slate blue magenta red red green green red">
+<table>
+<thead>
+<tr><th><strong>token</strong><br>one column per position</th><th>Paris</th><th>␣is</th><th>␣the</th><th>␣capital</th><th>␣of</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>input</strong><br>what the model knows</td><td class="kv-old">$\class{v-x v-x1}{x_1}$</td><td class="kv-old">$\class{v-x v-x2}{x_2}$</td><td class="kv-old">$\class{v-x v-x3}{x_3}$</td><td class="kv-old">$\class{v-x v-x4}{x_4}$</td><td>$\class{v-x v-x5}{x_5}$</td></tr>
+<tr><td><strong>query</strong><br>only the last token asks</td><td>·</td><td>·</td><td>·</td><td>·</td><td>$\class{v-q v-q5}{q_5} = \class{v-x v-x5}{x_5}\, \class{w-Q5}{W_Q}$</td></tr>
+<tr><td><strong>key</strong><br>every token answers</td><td class="kv-cache">$\class{v-k v-k1}{k_1} \class{rhs1}{= \class{v-x v-x1}{x_1}\, \class{w-K1}{W_K}}$</td><td class="kv-cache">$\class{v-k v-k2}{k_2} \class{rhs2}{= \class{v-x v-x2}{x_2}\, \class{w-K2}{W_K}}$</td><td class="kv-cache">$\class{v-k v-k3}{k_3} \class{rhs3}{= \class{v-x v-x3}{x_3}\, \class{w-K3}{W_K}}$</td><td class="kv-cache">$\class{v-k v-k4}{k_4} \class{rhs4}{= \class{v-x v-x4}{x_4}\, \class{w-K4}{W_K}}$</td><td>$\class{v-k v-k5}{k_5} \class{rhs5}{= \class{v-x v-x5}{x_5}\, \class{w-K5}{W_K}}$</td></tr>
+<tr><td><strong>score</strong><br>how well each key answers</td><td>$\class{v-s v-s1}{s_1} = \dfrac{\class{v-q v-q5}{q_5} \cdot \class{v-k v-k1}{k_1}}{\sqrt{d_h}}$</td><td>$\class{v-s v-s2}{s_2} = \dfrac{\class{v-q v-q5}{q_5} \cdot \class{v-k v-k2}{k_2}}{\sqrt{d_h}}$</td><td>$\class{v-s v-s3}{s_3} = \dfrac{\class{v-q v-q5}{q_5} \cdot \class{v-k v-k3}{k_3}}{\sqrt{d_h}}$</td><td>$\class{v-s v-s4}{s_4} = \dfrac{\class{v-q v-q5}{q_5} \cdot \class{v-k v-k4}{k_4}}{\sqrt{d_h}}$</td><td>$\class{v-s v-s5}{s_5} = \dfrac{\class{v-q v-q5}{q_5} \cdot \class{v-k v-k5}{k_5}}{\sqrt{d_h}}$</td></tr>
+<tr><td><strong>attention</strong><br>weights that sum to 1</td><td>$\class{v-a v-a1}{a_1} = \dfrac{e^{\class{v-s v-s1}{s_1}}}{\sum\nolimits_i e^{\class{v-s v-si}{s_i}}}$</td><td>$\class{v-a v-a2}{a_2} = \dfrac{e^{\class{v-s v-s2}{s_2}}}{\sum\nolimits_i e^{\class{v-s v-si}{s_i}}}$</td><td>$\class{v-a v-a3}{a_3} = \dfrac{e^{\class{v-s v-s3}{s_3}}}{\sum\nolimits_i e^{\class{v-s v-si}{s_i}}}$</td><td>$\class{v-a v-a4}{a_4} = \dfrac{e^{\class{v-s v-s4}{s_4}}}{\sum\nolimits_i e^{\class{v-s v-si}{s_i}}}$</td><td>$\class{v-a v-a5}{a_5} = \dfrac{e^{\class{v-s v-s5}{s_5}}}{\sum\nolimits_i e^{\class{v-s v-si}{s_i}}}$</td></tr>
+<tr><td><strong>value</strong><br>what each token offers</td><td class="kv-cache">$\class{v-v v-v1}{v_1} \class{rhs1}{= \class{v-x v-x1}{x_1}\, \class{w-V1}{W_V}}$</td><td class="kv-cache">$\class{v-v v-v2}{v_2} \class{rhs2}{= \class{v-x v-x2}{x_2}\, \class{w-V2}{W_V}}$</td><td class="kv-cache">$\class{v-v v-v3}{v_3} \class{rhs3}{= \class{v-x v-x3}{x_3}\, \class{w-V3}{W_V}}$</td><td class="kv-cache">$\class{v-v v-v4}{v_4} \class{rhs4}{= \class{v-x v-x4}{x_4}\, \class{w-V4}{W_V}}$</td><td>$\class{v-v v-v5}{v_5} \class{rhs5}{= \class{v-x v-x5}{x_5}\, \class{w-V5}{W_V}}$</td></tr>
+<tr><td><strong>weighted value</strong><br>value × attention</td><td>$\class{v-z v-z1}{z_1} = \class{v-a v-a1}{a_1}\, \class{v-v v-v1}{v_1}$</td><td>$\class{v-z v-z2}{z_2} = \class{v-a v-a2}{a_2}\, \class{v-v v-v2}{v_2}$</td><td>$\class{v-z v-z3}{z_3} = \class{v-a v-a3}{a_3}\, \class{v-v v-v3}{v_3}$</td><td>$\class{v-z v-z4}{z_4} = \class{v-a v-a4}{a_4}\, \class{v-v v-v4}{v_4}$</td><td>$\class{v-z v-z5}{z_5} = \class{v-a v-a5}{a_5}\, \class{v-v v-v5}{v_5}$</td></tr>
+<tr><td><strong>update</strong><br>the sum is added to « of »</td><td>$\class{v-x v-x5}{x_5} \mathrel{+}= (\class{v-z v-z1}{z_1} + \class{v-z v-z2}{z_2} + \class{v-z v-z3}{z_3} + \class{v-z v-z4}{z_4} + \class{v-z v-z5}{z_5})\, \class{w-O}{W_O}$ → <strong>France</strong></td><td></td><td></td><td></td><td></td></tr>
+
+</tbody>
+</table>
+</div>
+<p>Pass 2, one head: everything « ␣of » computes</p>
+<p data-cur="z x5" data-w="O">Start from the output: the update reads <strong>x<sub>5</sub></strong> and <strong>z<sub>1</sub> … z<sub>5</sub></strong>, and the weights <span class="kv-w">W<sub>O</sub></span></p>
+<p data-cur="a v">Each z<sub>j</sub> reads <strong>a<sub>j</sub></strong> and <strong>v<sub>j</sub></strong></p>
+<p data-cur="s">Each a<sub>j</sub> reads the scores <strong>s<sub>1</sub> … s<sub>5</sub></strong></p>
+<p data-cur="q k">Each score reads <strong>q<sub>5</sub></strong> and <strong>k<sub>j</sub></strong></p>
+<p data-cur="x5" data-w="Q5 K5 V5" data-past="k1 k2 k3 k4 v1 v2 v3 v4">q<sub>5</sub>, k<sub>5</sub>, v<sub>5</sub> read <strong>x<sub>5</sub></strong>. The past only enters through <span class="kv-p">k<sub>1</sub> … k<sub>4</sub> and v<sub>1</sub> … v<sub>4</sub></span>, from pass 1</p>
+<p data-cache>Same values as in pass 1: <strong>keep them</strong>, the KV cache. x<sub>1</sub> … x<sub>4</sub> are no longer needed</p>
+<p>The same in every head of every block: <strong>512 KiB per token</strong> for Llama-2-7B</p>
+</div>
+<script src="themes/eqgrid.js"></script>
+<script src="themes/kvtrace.js"></script>
+
+<aside class="notes" data-markdown>
+The table of « Attention, one head, one token » for « of » at pass 2 (n = 5), traced
+backwards from the update, variable by variable: each variable is coloured everywhere it
+appears (MathJax \class). Gold: just reached; muted gold: reached before; blue: weights;
+orange: k_1…k_4 and v_1…v_4, the only way the past comes in.
+
+512 KiB = 32 blocks × 32 heads × (k + v: 2 × 128 numbers) × 2 bytes (bf16), Llama-2-7B as in
+« Size of the KV cache ». The values on these slides come from Qwen3-1.7B, a smaller model that is
+quicker to run: the mechanism is the same.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Prefill, then decode</h1>
+
+<div class="pd" data-pd="summary">
+<p><strong>Prefill</strong>: the whole prompt in one pass, n rows at once</p>
+<p>It fills the <strong>KV cache</strong>: k and v of every prompt token, in every block and head</p>
+<p><strong>Decode</strong>: one token per pass. It reads the cache and appends its own k and v</p>
+<p>And again, one pass per token, until the end-of-text token</p>
+</div>
+
+<aside class="notes" data-markdown>
+One prefill pass over the whole prompt fills the KV cache and gives the first token; then
+one decode pass per token, each reading the cache and appending one k|v pair (gold).
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Prefill</h1>
+
+<div class="pd" data-pd="prefill">
+<p>Prefill « Paris is the capital »: <strong>x</strong> holds the n = 4 prompt rows</p>
+<p>Q = x · W<sub>Q</sub>, K = x · W<sub>K</sub>: <strong>matrix × matrix</strong>, n rows each</p>
+<p>Q · K<sup>T</sup>: <strong>n × n</strong> scores, masked, then softmax: A</p>
+<p>V = x · W<sub>V</sub>, Z = A · V, O = Z · W<sub>O</sub>: n rows</p>
+<p>K and V are stored in the <strong>KV cache</strong>, for this block and this head</p>
+</div>
+
+<aside class="notes" data-markdown>
+The layout of « Matrix version », same coordinates and colours, for the 4 prompt tokens:
+matrix × matrix products, n rows each. Then K and V are stored in the KV cache (top right).
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Decode</h1>
+
+<div class="pd" data-pd="decode">
+<p>Decode « ␣of »: only <strong>its row of x</strong>, 1 × d</p>
+<p>q<sub>5</sub> = x<sub>5</sub> · W<sub>Q</sub>: <strong>one row</strong></p>
+<p>k<sub>5</sub> = x<sub>5</sub> · W<sub>K</sub>: only the new key is computed</p>
+<p>k<sub>5</sub> is <strong>transposed</strong>: the last column of K<sup>T</sup></p>
+<p>Keys 1–4 come from the <strong>KV cache</strong>, transposed: the first columns of K<sup>T</sup></p>
+<p>q<sub>5</sub> · K<sup>T</sup>: <strong>1 × n</strong> scores</p>
+<p>Softmax: the attention weights a<sub>5</sub></p>
+<p>v<sub>5</sub> = x<sub>5</sub> · W<sub>V</sub>: x<sub>5</sub> goes under W<sub>V</sub></p>
+<p>v<sub>5</sub>: only the new value is computed</p>
+<p>v<sub>5</sub> is the <strong>last row</strong> of V</p>
+<p>Values 1–4 come from the <strong>KV cache</strong>: the first rows of V</p>
+<p>z<sub>5</sub> = a<sub>5</sub> · V: one row</p>
+<p>o<sub>5</sub> = z<sub>5</sub> · W<sub>O</sub>: one row</p>
+<p>k<sub>5</sub> is <strong>appended</strong> to the cache</p>
+<p>v<sub>5</sub> is appended too: n = 6 for the next token</p>
+</div>
+
+<aside class="notes" data-markdown>
+The same layout for « ␣of », n = 5: x, q, the scores, a, z and o are one row. Only k5 and
+v5 are computed; the cached keys fly from the cache and turn into columns 1–4 of Kᵀ, the
+cached values fly into rows 1–4 of V. At the end, k5ᵀ and v5 fly back into the cache.
+</aside>
+<script src="themes/prefill.js"></script>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Size of the KV cache</h1>
+
+<div class="eqgrid params params-kv" data-fixed="0" data-query="none" data-colors="blue blue magenta red">
+<table>
+<thead>
+<tr><th></th><th></th><th>Llama-2-7B</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>count per token per layer</strong><br>k and v of every head</td><td>$2 \cdot n_h \cdot d_h$</td><td>8 192</td></tr>
+<tr><td><strong>bytes per token per layer</strong><br>bf16: 2 bytes per number</td><td>$2 \cdot 2 \cdot n_h \cdot d_h$</td><td>16 KiB</td></tr>
+<tr><td><strong>bytes per token</strong><br>all the layers</td><td>$L \cdot 2 \cdot 2 \cdot n_h \cdot d_h$</td><td><strong>512 KiB</strong></td></tr>
+<tr><td><strong>bytes per 4 096 tokens</strong><br>one full context</td><td>$n \cdot L \cdot 2 \cdot 2 \cdot n_h \cdot d_h$</td><td><strong>2 GiB</strong></td></tr>
+</tbody>
+</table>
+</div>
+<script src="themes/eqgrid.js"></script>
+
+<aside class="notes" data-markdown>
+Same model as « Parameters ». Per token and per layer, the cache holds one k and one v
+(d_h = 128 numbers each) per head.
+
+Per layer: 2 · 32 · 128 = 8 192 numbers, 16 KiB in bf16.
+
+Per token: 32 × 16 KiB = 512 KiB (the number of « What « of » reads from the past »).
+
+4 096 tokens (Llama-2's context length): 2 GiB. Compare with the weights in bf16: 13.5 GB.
+A batch of 7 such contexts needs as much memory as the weights.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section class="takeaway">
+<h2>Key takeaways</h2>
+<h1>For each Inference request</h1>
+<ul>
+<li>Prefill processes the input tokens</li>
+<li>Decode generates the output tokens one at a time</li>
+<li>The per-user KV cache can grow HUGE</li>
+</ul>
+
+</section>
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>Prefill is compute-bound</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Abstract model of RTX 5090</h1>
+
+<div class="cost" data-cost="model"></div>
+
+<aside class="notes" data-markdown>
+A simple machine model, enough to estimate a prefill:
+
+- all the model parameters live in GPU memory (VRAM): Llama-2-7B is 13.5 GB of the 32 GB;
+- VRAM ↔ cache: 1.79 TB/s, read or write (GDDR7, 512 bits × 28 Gb/s);
+- the cache is infinite: any size, infinite bandwidth. VRAM data is copied there, temporaries
+  are allocated there. So tiling does not matter;
+- each operation reads its inputs from VRAM once and writes its result to VRAM once (otherwise
+  an infinite cache would keep everything, and only the weights would ever be read);
+- compute: 209.5 TFLOP/s, bf16 with fp32 accumulation, dense (third-party spec sheets; GeForce
+  cards run fp32 accumulation at half the fp16-accumulation rate).
+
+The prompt text and its token ids stay in host RAM: 16 KB, copied once, ignored.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Complexity of matrix product</h1>
+
+<div class="cost" data-cost="matmul"></div>
+
+<aside class="notes" data-markdown>
+A is a × b, B is b × c, C is a × c: the two b sides match.
+
+1. The top-left cell of C: row 1 of A against column 1 of B.
+2. c11 = a11·b11 + … + a1b·bb1, term by term: each term is 1 multiply + 1 add, so 2b FLOPs per cell.
+3. a · c cells, so 2abc FLOPs.
+4. Read A and B from VRAM into the cache, once: 2(ab + bc) bytes (bf16: 2 bytes per number).
+5. Write C back to VRAM, once: 2ac bytes.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Prefill: product by product</h1>
+
+<table class="costtab">
+<colgroup><col style="width:200px"><col style="width:400px"><col style="width:180px"><col style="width:170px"><col></colgroup>
+<thead><tr><th>product</th><th>shapes</th><th>FLOPs</th><th>weights</th><th>activations</th></tr></thead>
+<tbody>
+<tr class="cost-att"><td>x · W<sub>Q</sub></td><td>$(n \times d) \cdot (d \times n_h d_h)$</td><td>$2nd \cdot n_h d_h$</td><td>$2d \cdot n_h d_h$</td><td>$2n(d + n_h d_h)$</td></tr>
+<tr class="cost-att"><td>x · W<sub>K</sub>, x · W<sub>V</sub></td><td>$(n \times d) \cdot (d \times n_h d_h) \times 2$</td><td>$2 \cdot 2nd \cdot n_h d_h$</td><td>$2 \cdot 2d \cdot n_h d_h$</td><td>$2 \cdot 2n(d + n_h d_h)$</td></tr>
+<tr class="cost-mix"><td>Q · K<sup>T</sup></td><td>$(n \times d_h) \cdot (d_h \times n) \times n_h$</td><td>$2n^2 d_h \cdot n_h$</td><td class="zero">0</td><td>$2n_h(2nd_h + n^2)$</td></tr>
+<tr class="cost-mix"><td>softmax</td><td class="el">scale, −max, exp, sum, ÷: 5 per score</td><td>$5n^2 \cdot n_h$</td><td class="zero">0</td><td>$2n_h \cdot 2n^2$</td></tr>
+<tr class="cost-mix"><td>A · V</td><td>$(n \times n) \cdot (n \times d_h) \times n_h$</td><td>$2n^2 d_h \cdot n_h$</td><td class="zero">0</td><td>$2n_h(n^2 + 2nd_h)$</td></tr>
+<tr class="cost-att"><td>Z · W<sub>O</sub></td><td>$(n \times n_h d_h) \cdot (n_h d_h \times d)$</td><td>$2n \cdot n_h d_h \cdot d$</td><td>$2 \cdot n_h d_h \cdot d$</td><td>$2n(n_h d_h + d)$</td></tr>
+<tr class="cost-ffn"><td>gate, up</td><td>$(n \times d) \cdot (d \times d_{ff}) \times 2$</td><td>$2 \cdot 2nd \cdot d_{ff}$</td><td>$2 \cdot 2d \cdot d_{ff}$</td><td>$2 \cdot 2n(d + d_{ff})$</td></tr>
+<tr class="cost-ffn"><td>SiLU · ×</td><td class="el">g / (1 + e<sup>−g</sup>) · u: 5 per number</td><td>$5n \cdot d_{ff}$</td><td class="zero">0</td><td>$2 \cdot 3n \cdot d_{ff}$</td></tr>
+<tr class="cost-ffn"><td>down</td><td>$(n \times d_{ff}) \cdot (d_{ff} \times d)$</td><td>$2n \cdot d_{ff} \cdot d$</td><td>$2 \cdot d_{ff} \cdot d$</td><td>$2n(d_{ff} + d)$</td></tr>
+<tr class="cost-oth"><td>norms, residuals</td><td class="el">2 RMSNorm (4 per number), 2 adds</td><td>$10nd$</td><td class="zero">0</td><td>$2 \cdot 10nd$</td></tr>
+<tr class="cost-sum"><td>× L</td><td class="el">every block; + W<sub>E</sub> rows, W<sub>U</sub> once</td><td></td><td></td><td></td></tr>
+</tbody>
+</table>
+
+<aside class="notes" data-markdown>
+Every row follows « Complexity of matrix product »: read the inputs, write the result, 2 bytes
+per number. Weights and activations are the two kinds of input.
+
+n_h: one number of heads for Q, K and V, as in Llama-2-7B.
+
+Attention is untiled: Q · Kᵀ writes S (n × n per head), softmax reads S and writes A, A · V
+reads A. At n = 4 096 these three rows are 4.4 GB of the block's 5.7 GB, and the only ones that
+grow as n². K and V are written once, into the KV cache.
+
+Elementwise FLOPs, counting exp and ÷ as 1 each: softmax 5 per score (scale by 1/√d_h, subtract
+the row max, exp, sum, divide); SiLU · × 5 per number (negate, exp, +1, ÷, × u); RMSNorm 4 per
+number (square, sum, × 1/rms, × γ), residual 1.
+
+Llama-2-7B, n = 4 096: 62 TFLOPs, 13.2 GB of weights, 182 GB of activations.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>FLOPs vs prompt size</h1>
+
+<div class="cost" data-cost="flops"></div>
+
+<aside class="notes" data-markdown>
+Llama-2-7B, log-log: one line per product and the dashed total. On log-log a straight line's
+slope is its power of n: the weight products have slope 1, Q · Kᵀ and A · V slope 2.
+
+The n² part takes over at n ≈ 25 k. Grey band: beyond Llama-2's 4 096-token context. Full
+n × n counted (no causal skip).
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Compute time vs prompt size on 1x RTX 5090</h1>
+
+<div class="cost" data-cost="ftime"></div>
+
+<aside class="notes" data-markdown>
+FLOPs divided by 209.5 TFLOP/s × MFU 0.4 = 84 TFLOP/s. MFU, model FLOPs utilization: the
+fraction of the peak a real prefill reaches. Same curves as the previous slide, shifted down.
+
+Llama-2-7B: 165 ms for 1 k tokens, 0.74 s for 4 096, ≈ 2 h for 1 M.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Bytes vs prompt size</h1>
+
+<div class="cost" data-cost="bytes"></div>
+
+<aside class="notes" data-markdown>
+Untiled attention: S and A go through VRAM, 8 · n_h · n² bytes per layer. Above a few thousand
+tokens they dwarf everything, weights included.
+
+On log-log: the weights are flat (slope 0), the other activations slope 1, S and A slope 2.
+
+At 1 M tokens, Llama-2-7B would move ≈ 9 PB per prefill for S and A alone: 1.4 hours at
+1.79 TB/s. That motivates FlashAttention later.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Memory time vs prompt size on 1x RTX 5090</h1>
+
+<div class="cost" data-cost="btime"></div>
+
+<aside class="notes" data-markdown>
+Bytes divided by 1.79 TB/s × MBU 0.7 = 1.25 TB/s. MBU, memory bandwidth utilization: the
+fraction of the peak bandwidth a real kernel reaches.
+
+Llama-2-7B: 26 ms for 1 k tokens, against 165 ms of compute.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Prefill is Compute-bound</h1>
+
+<div class="cost" data-cost="bound"></div>
+
+<aside class="notes" data-markdown>
+The two totals of the time slides on one plot: compute time above memory time means the GPU
+waits on its tensor cores, not on VRAM.
+
+At 1 k tokens, Llama-2-7B: 165 ms of compute for 26 ms of memory. FLOPs per byte is ≈ 420,
+far above what this GPU can feed: 84 T / 1.25 T ≈ 67 FLOPs per byte.
+
+The lines meet near 700 k tokens: untiled attention makes very long prompts memory bound, far
+beyond the model's context.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Roofline analysis</h1>
+
+<div class="cost" data-cost="roofline"></div>
+
+<aside class="notes" data-markdown>
+x: arithmetic intensity, FLOPs per byte. y: the FLOP/s the GPU can reach at that intensity.
+
+The roof: a slope of 1.25 TB/s (memory bound, left) up to a flat 84 TFLOP/s (compute bound,
+right). They meet at the ridge, 84 T / 1.25 T ≈ 67 FLOPs per byte. Dashed: the same roof at
+peak, 209.5 TFLOP/s and 1.79 TB/s, ridge ≈ 117.
+
+Each dot is one prefill of Llama-2-7B, n from 1 k to 1 M: all right of the ridge, compute bound.
+Intensity peaks near 1 k tokens (≈ 420), then falls as the n² bytes of S and A grow, reaching
+the ridge only near 1 M.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section class="takeaway">
+<h2>Key takeaways</h2>
+<h1>Prefill <strong>is</strong> compute-bound</h1>
+<ul>
+<li>FFN compute dominates at small context size</li>
+<li>Attention compute dominates at large context size</li>
+</ul>
+
+</section>
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>Decode is bandwidth-bound</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Decode: product by product</h1>
+
+<table class="costtab">
+<colgroup><col style="width:190px"><col style="width:330px"><col style="width:190px"><col style="width:160px"><col></colgroup>
+<thead><tr><th>product</th><th>shapes</th><th>FLOPs</th><th>weights</th><th>activations</th></tr></thead>
+<tbody>
+<tr class="cost-att"><td>x · W<sub>Q</sub></td><td>$({\color{#f5c451} 1} \times d) \cdot (d \times n_h d_h)$</td><td>$2 \cdot {\color{#f5c451} 1} \cdot d \cdot n_h d_h$</td><td>$2d \cdot n_h d_h$</td><td>$2 \cdot {\color{#f5c451} 1} \cdot (d + n_h d_h)$</td></tr>
+<tr class="cost-att"><td>x · W<sub>K</sub>, x · W<sub>V</sub></td><td>$({\color{#f5c451} 1} \times d) \cdot (d \times n_h d_h) \times 2$</td><td>$2 \cdot 2 \cdot {\color{#f5c451} 1} \cdot d \cdot n_h d_h$</td><td>$2 \cdot 2d \cdot n_h d_h$</td><td>$2 \cdot 2 \cdot {\color{#f5c451} 1} \cdot (d + n_h d_h)$</td></tr>
+<tr class="cost-mix"><td>q · K<sup>T</sup></td><td>$({\color{#f5c451} 1} \times d_h) \cdot (d_h \times n) \times n_h$</td><td>$2 \cdot {\color{#f5c451} 1} \cdot nd_h \cdot n_h$</td><td class="zero">0</td><td>$2n_h({\color{#f5c451} 1} \cdot d_h + nd_h + {\color{#f5c451} 1} \cdot n)$</td></tr>
+<tr class="cost-mix"><td>softmax</td><td class="el">5 per score</td><td>$5 \cdot {\color{#f5c451} 1} \cdot n \cdot n_h$</td><td class="zero">0</td><td>$2n_h \cdot 2 \cdot {\color{#f5c451} 1} \cdot n$</td></tr>
+<tr class="cost-mix"><td>a · V</td><td>$({\color{#f5c451} 1} \times n) \cdot (n \times d_h) \times n_h$</td><td>$2 \cdot {\color{#f5c451} 1} \cdot nd_h \cdot n_h$</td><td class="zero">0</td><td>$2n_h({\color{#f5c451} 1} \cdot n + nd_h + {\color{#f5c451} 1} \cdot d_h)$</td></tr>
+<tr class="cost-att"><td>z · W<sub>O</sub></td><td>$({\color{#f5c451} 1} \times n_h d_h) \cdot (n_h d_h \times d)$</td><td>$2 \cdot {\color{#f5c451} 1} \cdot n_h d_h \cdot d$</td><td>$2 \cdot n_h d_h \cdot d$</td><td>$2 \cdot {\color{#f5c451} 1} \cdot (n_h d_h + d)$</td></tr>
+<tr class="cost-ffn"><td>gate, up</td><td>$({\color{#f5c451} 1} \times d) \cdot (d \times d_{ff}) \times 2$</td><td>$2 \cdot 2 \cdot {\color{#f5c451} 1} \cdot d \cdot d_{ff}$</td><td>$2 \cdot 2d \cdot d_{ff}$</td><td>$2 \cdot 2 \cdot {\color{#f5c451} 1} \cdot (d + d_{ff})$</td></tr>
+<tr class="cost-ffn"><td>SiLU · ×</td><td class="el">5 per number</td><td>$5 \cdot {\color{#f5c451} 1} \cdot d_{ff}$</td><td class="zero">0</td><td>$2 \cdot 3 \cdot {\color{#f5c451} 1} \cdot d_{ff}$</td></tr>
+<tr class="cost-ffn"><td>down</td><td>$({\color{#f5c451} 1} \times d_{ff}) \cdot (d_{ff} \times d)$</td><td>$2 \cdot {\color{#f5c451} 1} \cdot d_{ff} \cdot d$</td><td>$2 \cdot d_{ff} \cdot d$</td><td>$2 \cdot {\color{#f5c451} 1} \cdot (d_{ff} + d)$</td></tr>
+<tr class="cost-oth"><td>norms, residuals</td><td class="el">2 RMSNorm, 2 adds</td><td>$10 \cdot {\color{#f5c451} 1} \cdot d$</td><td class="zero">0</td><td>$2 \cdot 10 \cdot {\color{#f5c451} 1} \cdot d$</td></tr>
+<tr class="cost-sum"><td>× L</td><td class="el">every block; + W<sub>U</sub> at every step</td><td></td><td></td><td></td></tr>
+</tbody>
+</table>
+
+<aside class="notes" data-markdown>
+The prefill table with 1 new row instead of n: x is 1 × d. The context n only enters attention,
+through the KV cache.
+
+Weight products: FLOPs = weight bytes. 1 FLOP per byte: every weight is read for a single row.
+
+Gold 1: where prefill has n new rows, decode has 1. The weights column has none: the weights
+are read whole, whatever the number of rows.
+
+q · Kᵀ and a · V read the whole KV cache of the sequence, n · d_h numbers per head, for
+2 FLOPs each: also about 1 FLOP per byte.
+
+K and V of the new token are written once into the cache. The unembedding W_U now runs at every
+step.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>FLOPs per token vs context size</h1>
+
+<div class="cost" data-cost="dflops"></div>
+
+<aside class="notes" data-markdown>
+One step, one sequence: 2 FLOPs per weight, ≈ 13.2 GFLOP, plus attention, 4 · L · n · n_h d_h,
+linear in n (slope 1), not n².
+
+The weights dominate up to n ≈ 25 k, the same crossing as in prefill. Grey: the KV cache of a
+single sequence no longer fits next to the weights (34 k tokens: 18.5 GB / 512 KiB).
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Bytes per token vs context size</h1>
+
+<div class="cost" data-cost="dbytes"></div>
+
+<aside class="notes" data-markdown>
+Every step reads all the weights, 13.2 GB, for one token. And the whole KV cache: 512 KiB per
+context token, 0.5 GB at n = 1 k.
+
+Same shape as the FLOPs: bytes ≈ FLOPs at every n. That is the « 1 FLOP per byte » of the table.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Time per token on 1x RTX 5090</h1>
+
+<div class="cost" data-cost="dtime"></div>
+
+<aside class="notes" data-markdown>
+Same rates as for prefill: 1.25 TB/s and 84 TFLOP/s.
+
+At n = 1 k: 11 ms of memory for 0.16 ms of compute, 70× apart. ≈ 91 tokens/s, and the tensor
+cores are idle 98.5 % of the time.
+
+The gap is the ratio of the two rates, 84 T / 1.25 T ≈ 67, because decode does ≈ 1 FLOP per
+byte: it never closes, whatever n.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Batching: B sequences share the weights</h1>
+
+<div class="cost" data-cost="batch"></div>
+
+<aside class="notes" data-markdown>
+Decode B sequences together: their B new rows form a B × d matrix X, and every weight read now
+serves B rows. Weight products reach B FLOPs per byte.
+
+But each sequence attends to its own past: its K and V are its own, read for its single row.
+Attention stays at 1 FLOP per byte, whatever B.
+
+And each sequence's cache takes VRAM: B · n · 512 KiB must fit next to the 13.5 GB of weights.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Throughput vs batch size</h1>
+
+<div class="cost" data-cost="throughput"></div>
+
+<aside class="notes" data-markdown>
+Tokens per second for the whole batch, B / time per step.
+
+Short contexts: the time per step hardly grows with B (the weights dominate the bytes), so
+throughput grows ≈ linearly: n = 128 goes from 94 to 6 300 tokens/s.
+
+Long contexts: each sequence adds its own cache to read, and the VRAM fills fast: n = 4 k stops
+at 8 sequences, 326 tokens/s.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Roofline analysis</h1>
+
+<div class="cost" data-cost="droofline"></div>
+
+<aside class="notes" data-markdown>
+The prefill roofline, with decode on it. B = 1: every context sits at ≈ 1 FLOP per byte, far
+left of the ridge (67).
+
+Batching moves each curve right, up to the largest B that fits in VRAM: n = 128 reaches the
+flat part (B = 275, ≈ 115 FLOPs per byte); n = 1 k stops at ≈ 15 (B = 34); n = 4 k at ≈ 4 (B = 8).
+
+Even with infinite VRAM, each curve flattens at 1 + 2P / (k · n): 26 for n = 1 k, 7 for n = 4 k.
+Long-context decode is bandwidth-bound whatever the batch.
+</aside>
+<script src="themes/cost.js"></script>
+</section>
+
+<!-- ================================================================ -->
+<section class="takeaway">
+<h2>Key takeaways</h2>
+<h1>Decode <strong>is</strong> bandwidth-bound</h1>
+<ul>
+<li>Reading the weights dominates at small context size</li>
+<li>Reading the KV cache dominates at large context sizes</li>
+</ul>
+
+</section>
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>Flash-attention: a tiling case study</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Real hardware: the cache is finite</h1>
+
+<div class="flash" data-flash="hierarchy"></div>
+
+<aside class="notes" data-markdown>
+Our model had an infinite cache: copy a whole matrix in, compute, write the result back. Real
+hardware has a finite one: on the RTX 5090, 96 MB of L2 shared by the whole chip, and 128 KB of
+L1 / shared memory in each SM (streaming multiprocessor: the GPU's core, 170 of them), next to
+its tensor cores.
+
+We keep infinite bandwidth between L2, L1 and the tensor cores. That is still a simplification:
+on-chip bandwidth is finite too, but at least 10× better than VRAM ⇄ L2, so VRAM stays the
+bottleneck.
+
+A tile must fit in 128 KB: 64 K bf16 numbers, a 256 × 256 block. One Llama-2-7B weight matrix,
+4 096 × 4 096, is 256 such blocks. So a kernel reads **parts** of its inputs, a tile at a time,
+computes what they allow, and moves on.
+
+From here on, operations also run one after the other: each one is bound by its own roofline,
+and the times add up.
+
+Cache sizes: TechPowerUp and Cowcotland reports of the GB202 / RTX 5090.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Tiling a matrix product</h1>
+
+<div class="flash" data-flash="tiling"></div>
+
+<aside class="notes" data-markdown>
+The same product, four ways to cut C into tiles, one per step. FLOPs never change: 2abc.
+
+**1 row**: keep a row of A, stream every column of B; B is read once per row of A: ab + abc.
+
+**1 column**: the mirror image: bc + abc.
+
+**l × m tiles**: keep l rows of A, stream B by groups of m columns: B is read a / l times,
+ab + abc / l. Bigger tiles, fewer reads, but they need b(l + m) + lm numbers of cache.
+
+The whole matrix as one tile (6 × 12) is our idealized model: every number read once, ab + bc.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Attention: S and A never fit</h1>
+
+<div class="flash" data-flash="nofit"></div>
+
+<aside class="notes" data-markdown>
+Area to scale: one layer's S at n = 4 096 (1 GiB) against the L2 (96 MB) and one SM's 128 KB,
+the green dot.
+
+The prefill section counted S and A through VRAM: 8 · n<sub>h</sub> · n² bytes per layer. On
+real hardware this is unavoidable as long as softmax is a separate step: it needs the whole row
+of S before it can normalize it.
+
+And the softmax is memory bound (5 FLOPs per 8 bytes): its time adds to the GEMMs'.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>FlashAttention-2: chained tiles</h1>
+
+<div class="flash" data-flash="chain"></div>
+
+<aside class="notes" data-markdown>
+FlashAttention-2 chains the three steps inside one kernel. One SM takes a block of
+B<sub>r</sub> query rows Q<sub>i</sub>, then streams K and V tile by tile:
+S<sub>ij</sub> = Q<sub>i</sub>K<sub>j</sub><sup>T</sup> lives only in SRAM; the online softmax
+keeps a running max m and sum ℓ per row and rescales O<sub>i</sub> when m grows;
+O<sub>i</sub> += e<sup>S − m</sup>V<sub>j</sub>.
+
+S and A never reach VRAM. What remains: Q read once, O written once, K and V read once per block
+of query rows (often less: the L2 shares them between the SMs working on the same head).
+
+Bytes per layer through VRAM: without FA2, n<sub>h</sub> · (8n² + 8n d<sub>h</sub>); with FA2,
+n<sub>h</sub> · (4n d<sub>h</sub> + 4n² d<sub>h</sub> / B<sub>r</sub>). With
+B<sub>r</sub> = d<sub>h</sub> = 128, the n² term halves.
+
+The bigger gain is not the bytes but the fusion: one compute-bound kernel,
+(4d<sub>h</sub> + 5) FLOPs per 4 bytes ≈ 129 FLOPs per byte, instead of two GEMMs plus a
+memory-bound softmax (5 FLOPs per 8 bytes).
+
+Steps 0–5: the first block of rows, tile by tile. Steps 6–8: each next block plays by itself.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Impact on prefill and decode</h1>
+
+<div class="flash" data-flash="impact"></div>
+
+<aside class="notes" data-markdown>
+Time = Σ over operations of max(FLOPs / 84 T, bytes / 1.25 T), Llama-2-7B, n<sub>h</sub> = 32,
+B<sub>r</sub> = 128.
+
+**Prefill**: +7 % at 4 k tokens, +29 % at 32 k, +50 % at 1 M. The untiled softmax was the only
+memory-bound part of attention; FA2 removes it, and the n² FLOPs stay.
+
+**Decode**: ≈ 0 to 2 %. One row per step: S is 1 × n, tiny. Decode's bytes are the weights and
+the KV cache, which FA2 cannot avoid reading: tiling saves the traffic of intermediate results,
+not of inputs.
+
+Real untiled kernels do worse than this model (fp32 scores, a separate mask), so measured FA2
+gains in prefill are larger.
+
+Two things this model leaves out. Capacity: without FA, S of one head at 32 k tokens is 2 GiB;
+long prefills run out of VRAM before they get slow. And reaching the bandwidth: at B = 1, one query
+row per head gives a naive kernel 32 blocks for 170 SMs; Flash-Decoding splits the KV cache along
+n across SMs. It saves no bytes, it lets decode run at full bandwidth, which our model assumes.
+</aside>
+<script src="themes/flash.js"></script>
+</section>
+
+<!-- ================================================================ -->
+<section class="takeaway">
+<h2>Key takeaways</h2>
+<h1>LLM optimization is about</h1>
+<ul>
+<li>Tiling computations</li>
+<li>Chaining tiling computations</li>
+</ul>
+
+</section>
+
+<!-- ================================================================ -->
+<section data-section>
+<h1>Conclusion</h1>
+
+<ul>
+<li>Inference is prefill + decode</li>
+<li>Prefill is compute-bound</li>
+<li>Decode is bandwidth-bound</li>
+<li>Tiling is a fundamental optimization pattern</li>
+</ul>
+</section>
+
+
+
+<script src="vendor/reveal/reveal.js"></script>
+<script src="vendor/reveal/notes.js"></script>
+<script src="themes/deck.js"></script>
+<!-- followers follow on their laptops: press L to pick the channel + QR (themes/sync-qr.js) -->
+<script src="themes/sync.js" data-topic-base="inria-llm" data-deck="llm-inference" data-follower="follower.html"></script>
+<script src="themes/sync-qr.js"></script>
+</body>
+</html>

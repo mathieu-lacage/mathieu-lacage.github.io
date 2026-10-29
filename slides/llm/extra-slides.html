@@ -1,0 +1,84 @@
+<!-- ================================================================ -->
+<section class="title">
+<h1>LLMs are (not) magical</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Mixture of Experts</h1>
+
+<div class="ffn" data-ffn="moe">
+<p>The FFN of the previous slides: every token goes through <strong>the same</strong> Up and Down</p>
+<p>Create <strong>8 independent FFNs</strong>, each with its own weights: the <strong>experts</strong></p>
+<p>A <strong>router</strong>: x · W<sub>router</sub>, then softmax: <strong>8 scores per token</strong></p>
+<p>« Paris » keeps its <strong>top 2</strong> scores: expert 3 (0.62) and expert 6 (0.38)</p>
+<p>« Paris » goes through FFN 3 and FFN 6 only: the other 6 are <strong>not computed</strong></p>
+<p>« is »: its top 2 are experts 1 and 6, then the same multiply and sum</p>
+<p>« the »: experts 1 and 4</p>
+<p>« capital »: experts 6 and 8. Each token does the work of <strong>2 FFNs</strong>, out of 8 stored</p>
+</div>
+
+<aside class="notes" data-markdown>
+An expert is just a copy of the FFN of the previous slides (Up → wide vector → Down), with
+its own weights. The router picks 2 of the 8 per token; the other 6 are never computed for
+that token. The routing here is a cartoon.
+
+Qwen3-30B-A3B (local config.json): d = 2 048, 128 experts of d_ff = 768, 8 per token, 48 layers.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>The router</h1>
+
+<div class="ffn" data-ffn="router">
+<p>« Paris »: its vector x, d numbers, as it enters the FFN layer</p>
+<p>The router is one matrix, <strong>W<sub>router</sub></strong>: d rows, <strong>one column per expert</strong></p>
+<p>Score of expert 1: <strong>x · column 1</strong>, a dot product</p>
+<p>Score of expert 2: x · column 2</p>
+<p>And so on: x W<sub>router</sub> gives <strong>8 scores</strong>, one per expert</p>
+<p><strong>Softmax</strong>: the 8 scores become probabilities that sum to 1</p>
+<p>Keep the <strong>top 2</strong>: expert 3 (0.41) and expert 6 (0.25). The other 6 are dropped</p>
+<p><strong>Renormalize</strong> the 2 kept: 0.41 / 0.66 = <strong>0.62</strong> and 0.25 / 0.66 = <strong>0.38</strong></p>
+</div>
+
+<aside class="notes" data-markdown>
+Same cross layout as the matrix slides: x on the left, W_router above, the scores where they meet.
+
+Qwen3 MoE: softmax over all experts, keep the top k, then renormalize the kept ones
+(norm_topk_prob = true in config.json). The numbers are made up so that « Paris » gets
+0.62 / 0.38 for experts 3 and 6, as on the previous slide.
+</aside>
+<script src="themes/ffn.js"></script>
+</section>
+
+
+<!-- ================================================================ -->
+<section>
+<h1>Grouped-Query Attention</h1>
+
+<div class="viz" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="2">
+<p>Same layer, H = 4 query heads, but only <strong>n<sub>kv</sub> = 2</strong> key / value heads</p>
+<p>W<sub>Q</sub> is still d × d, but W<sub>K</sub> and W<sub>V</sub> are only d × n<sub>kv</sub> d<sub>h</sub>: fewer weights, smaller K and V</p>
+<p>Head 1 uses its slice of W<sub>Q</sub>, and slice 1 of W<sub>K</sub> and W<sub>V</sub></p>
+<p>Regroup by <strong>key / value head</strong>: heads 1 and 2 share K<sub>1</sub>, V<sub>1</sub>; heads 3 and 4 share K<sub>2</sub>, V<sub>2</sub></p>
+<p>Each query head still has its own <strong>attention</strong>: A<sub>1</sub> = softmax(Q<sub>1</sub> K<sub>1</sub><sup>T</sup> …), A<sub>2</sub> = softmax(Q<sub>2</sub> K<sub>1</sub><sup>T</sup> …): same keys, different queries</p>
+<p>Z<sub>1</sub> = A<sub>1</sub> · V<sub>1</sub> and Z<sub>2</sub> = A<sub>2</sub> · V<sub>1</sub>: the same values, mixed differently</p>
+<p>From here on, nothing changes: the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
+<p>W<sub>O</sub> is d × d, cut into H row slices</p>
+<p>Head 1 adds Z<sub>1</sub> · W<sub>O</sub><sup>(1)</sup> to O</p>
+<p>Head 2 adds Z<sub>2</sub> · W<sub>O</sub><sup>(2)</sup></p>
+<p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
+<p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>: <strong>O</strong> = Z · W<sub>O</sub>, n × d, as in multi-head attention</p>
+</div>
+<script src="themes/heads.js"></script>
+
+<aside class="notes" data-markdown>
+Grouped-query attention (GQA): n_q query heads share n_kv key / value heads, n_q / n_kv
+query heads per group. n_kv = n_q is multi-head attention, n_kv = 1 multi-query attention (MQA).
+Qwen3-1.7B: 16 query heads, 8 KV heads, the same 2 per group as here; Llama-2-7B is plain MHA.
+Why: K and V are what decoding keeps for every past token (the KV cache, in « Inference »);
+halving the KV heads halves the cache, at a small cost in quality.
+</aside>
+</section>
+

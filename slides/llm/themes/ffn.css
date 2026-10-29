@@ -1,0 +1,54 @@
+/* FFN slides (themes/ffn.js): the figure is an SVG in slide coordinates on a layer over
+   the whole slide; the caption box sits above the footer, as in themes/linalg.css. */
+.ffn { position: absolute; inset: 0; pointer-events: none; }
+.ffn-body { position: absolute; inset: 0; }
+.ffn-body > svg { position: absolute; left: 0; top: 0; overflow: visible; }
+.ffn svg text { font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; letter-spacing: normal; fill: var(--cutebugs-ink); }
+.ffn-caps { position: absolute; left: 72px; right: 72px; top: 584px; display: grid; }
+.ffn-caps > p {
+  grid-area: 1 / 1; margin: 0 !important; min-height: 58px; font-size: 23px; line-height: 1.3; box-sizing: border-box;
+  background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-blue); padding: 12px 22px;
+}
+.ffn-caps > p.is-off { visibility: hidden; }
+
+/* steps: hidden elements; animations replayed on entering their step (class play) */
+.ffn [data-s], .ffn [data-e] { transition: opacity .35s; }
+.ffn .off { opacity: 0 !important; }
+.ffn .hop { opacity: 0; }
+.ffn .play.hop { animation: ffn-hop var(--dur) var(--delay, 0s) steps(var(--n), end); }
+.ffn .play .pop, .ffn .play.pop { animation: ffn-pop .18s var(--delay, 0s) both; }
+@keyframes ffn-hop { from { opacity: 1; transform: translateX(0); } to { opacity: 1; transform: translateX(var(--w)); } }
+@keyframes ffn-pop { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ffn .play.hop, .ffn .play .pop, .ffn .play.pop { animation: none; } }
+
+/* « FFN, all tokens »: an eqpair table with three formula columns
+   (one element | ⟶ | one token | ⟶ | all tokens), stepped one row at a time */
+section .eqpair.ffneq table { font-size: 20px; width: 100%; table-layout: fixed; }
+section .eqpair.ffneq :is(th, td):nth-child(2) { width: 330px; }
+section .eqpair.ffneq :is(th, td):nth-child(4) { width: 230px; }
+section .eqpair.ffneq .eqpair-sz { font-size: 13px; white-space: normal; }
+section .eqpair.ffneq th, section .eqpair.ffneq td { height: 62px; }
+section .eqpair.ffneq :is(th, td):nth-child(3), section .eqpair.ffneq :is(th, td):nth-child(5) { width: 40px; text-align: center; color: var(--cutebugs-dim); }
+section .eqpair.ffneq td:nth-child(4) { font-size: 20px; }
+section .eqpair.ffneq td:nth-child(6) { font-size: 22px; }
+section .eqpair.ffneq td.eqgrid-merged { text-align: left; }
+
+/* « Two models, their shapes » and « Where the parameters are »: eqgrid tables,
+   one row per hyperparameter or kind of weight, one column per model */
+section .eqgrid.params table { font-size: 24px; width: 100%; table-layout: fixed; }
+section .eqgrid.params thead th { height: 40px; font-weight: 400; color: var(--cutebugs-slate); }
+section .eqgrid.params :is(th, td):first-child { width: 230px; }
+section .eqgrid.params :is(th, td):nth-child(2) { text-align: left; }
+section .eqgrid.params .params-sz { margin-left: 6px; font-size: 16px; color: var(--cutebugs-slate); }
+section .eqgrid.params-shape td { height: 52px; }
+section .eqgrid.params-shape :is(th, td):first-child { width: 120px; }
+section .eqgrid.params-shape :is(th, td):first-child strong { font-size: 24px; }
+section .eqgrid.params-shape :is(th, td):nth-child(2) { width: 380px; font-size: 18px; color: var(--cutebugs-slate); }
+section .eqgrid.params-count td { height: 76px; }
+section .eqgrid.params-count :is(th, td):nth-child(2) { width: 400px; }
+section .eqgrid.params-count td mjx-container { font-size: 100%; }
+section .eqgrid.params-kv td { height: 84px; }
+section .eqgrid.params-kv :is(th, td):first-child { width: 320px; }
+section .eqgrid.params-kv :is(th, td):nth-child(2) { width: 290px; }
+section .eqgrid.params-kv td mjx-container { font-size: 100%; }
+section .eqgrid.params-count td:nth-child(n+3) { padding: 0 8px; }

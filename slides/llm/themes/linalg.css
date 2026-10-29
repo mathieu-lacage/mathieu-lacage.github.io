@@ -1,0 +1,45 @@
+/* Linear algebra refresher (themes/linalg.js): every element is placed in slide
+   coordinates on a layer over the whole slide; the caption box sits above the footer. */
+.la { position: absolute; inset: 0; pointer-events: none; font-size: 15px; line-height: 1.5; letter-spacing: .5px; }
+.la-body { position: absolute; inset: 0; }
+.la-caps { position: absolute; left: 72px; right: 72px; top: 584px; display: grid; }
+.la-caps > p {
+  grid-area: 1 / 1; margin: 0 !important; min-height: 58px; font-size: 23px; line-height: 1.3; box-sizing: border-box;
+  background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-blue); padding: 12px 22px;
+}
+.la-caps > p.is-off { visibility: hidden; }
+.la .t { position: absolute; font-size: 24px; line-height: 1.3; white-space: nowrap; }
+.la .t.sm { font-size: 19px; color: var(--cutebugs-slate); }
+.la .t.mono, .la .mono { font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; }
+.la .t b, .la .box b { color: var(--cutebugs-red); font-weight: 600; }
+.la .fade { transition: opacity .5s; }
+.la .pop { animation: la-pop .45s ease-out; }
+@keyframes la-pop { from { opacity: 0; transform: translateY(6px); } }
+
+.la .mx { position: absolute; }
+.la .mx::before, .la .mx::after { content: ''; position: absolute; top: -5px; bottom: -5px; width: 10px; border: 3px solid var(--cutebugs-slate); }
+.la .mx::before { left: -9px; border-right: 0; }
+.la .mx::after { right: -9px; border-left: 0; }
+.la .mx.nob::before, .la .mx.nob::after { display: none; }
+.la .cell { position: absolute; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+  font: 500 22px 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; color: var(--cutebugs-ink); border: 1px solid #22304b;
+  transition: background .25s, color .25s, left .8s cubic-bezier(.5,0,.3,1), top .8s cubic-bezier(.5,0,.3,1), opacity .4s; }
+.la .cell.ra { background: rgba(74,168,255,.16); }
+.la .cell.rb { background: rgba(217,127,208,.16); }
+.la .cell.ra.hot { background: var(--cutebugs-blue); color: #08111f; }
+.la .cell.rb.hot { background: var(--cutebugs-magenta); color: #08111f; }
+.la .cell.w { background: rgba(245,196,81,.14); color: var(--cutebugs-red); }
+.la .cell.w.hot { background: var(--cutebugs-red); color: #08111f; }
+.la .cell.flash { animation: la-flash .6s ease-out; }
+@keyframes la-flash { from { background: var(--cutebugs-red); color: #08111f; } }
+.la .mlab { position: absolute; transform: translateX(-50%); white-space: nowrap; font: 500 20px 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; color: var(--cutebugs-slate); }
+.la .mlab b { font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; font-size: 24px; color: var(--cutebugs-ink); font-weight: 600; margin-right: 8px; }
+.la .op { position: absolute; font: 400 36px 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; color: var(--cutebugs-slate); transform: translate(-50%, -50%); }
+.la .box { position: absolute; background: var(--cutebugs-panel); border-radius: 4px; padding: 14px 20px; box-sizing: border-box; font-size: 21px; line-height: 1.4; }
+.la .box h4 { margin: 0 0 6px; font: 600 15px 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--cutebugs-blue); }
+.la svg text { font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; }
+.la .tex { color: var(--cutebugs-ink); font-size: 24px; line-height: 1; }
+.la .tex.abs { position: absolute; }
+.la .eqs { position: absolute; left: 690px; top: 140px; width: 540px; height: 440px; display: flex; flex-direction: column; justify-content: flex-start; gap: 18px; }
+.la .eqs .tex.old { color: var(--cutebugs-slate); opacity: .55; }
+@media (prefers-reduced-motion: reduce) { .la .cell, .la .fade { transition: none; } .la .pop, .la .cell.flash { animation: none; } }

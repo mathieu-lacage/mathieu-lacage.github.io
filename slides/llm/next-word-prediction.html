@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Next word probability and similarity</title>
+<link rel="stylesheet" href="vendor/reveal/reveal.css">
+<link rel="stylesheet" href="themes/cutebugs.css">
+<link rel="stylesheet" href="themes/decoding.css">
+<link rel="stylesheet" href="themes/nextword.css">
+<link rel="stylesheet" href="themes/linalg.css">
+<link rel="stylesheet" href="themes/ffn.css">
+<link rel="stylesheet" href="themes/kvcache.css">
+<link rel="stylesheet" href="themes/prefill.css">
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+  svg: { fontCache: 'local' },  // local: themes/linalg.js typesets with tex2svg after startup
+};
+</script>
+<script src="vendor/mathjax/tex-svg-full.js" defer></script>
+<script src="themes/steps.js"></script>
+<script src="themes/viz-core.js"></script>
+<script src="themes/braces.js"></script>
+</head>
+<body data-overview="sections">
+<!-- copied into every slide by themes/deck.js -->
+<footer id="footer" hidden>Next word probability and similarity — 2026-10-08 — <a href="mailto:mathieu.lacage@inria.fr">mathieu.lacage@inria.fr</a></footer>
+<div class="reveal">
+<div class="slides">
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>Next word probability and similarity</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Only probabilities</h1>
+<p>An LLM is a machine that</p>
+<ul>
+<li>does not think</li>
+<li>is not conscious</li>
+<li>has no objective</li>
+<li>is not intelligent</li>
+</ul>
+<p><strong>It</strong> calculates probabilities. Nothing more.</p>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Conditional probabilities</h1>
+
+<div class="nw" data-prompt="Paris is the capital" data-vocab="100000">
+<p>of:38 France:31 in:9 our:4 this:2</p>
+<p>France:81 region:6 Belgium:3 Texas:2 Britanny:1</p>
+</div>
+<script src="themes/nextword.js"></script>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Combinatorials</h1>
+<p>If your vocabulary is 100 000 words</p>
+<ul>
+<li>10 words : <strong>$10^{50}$</strong> possible sequences</li>
+<li>100 words : <strong>$10^{500}$</strong> possible sequences</li>
+</ul>
+<p>Observable universe: $10^{80}$ atoms</p>
+<p class="fragment">It is <strong>impossible</strong> to calculate the probability of each sequence.</p>
+</section>
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>Linear Algebra Refresher</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>A vector is a list of numbers</h1>
+
+<div class="la" data-la="vector">
+<p>A vector is a list of numbers, written as a column: <strong>shape (2, 1)</strong>, 2 rows and 1 column</p>
+<p>In 2-D it is an arrow: <strong>x₁ = 3</strong> steps along the first axis …</p>
+<p>… and <strong>x₂ = 2</strong> steps along the second</p>
+<p>A token is a vector too: <strong>d = 2048</strong> numbers in Qwen3-1.7B. No arrow to draw, same rules</p>
+</div>
+
+<aside class="notes" data-markdown>
+d is the vector size: the deck uses n for the number of tokens. The colour strip is how x is drawn on the Self-Attention slides.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Cosine similarity</h1>
+
+<div class="la" data-la="cosine">
+<p>The cosine similarity of two vectors is <strong>cos θ</strong>, θ the angle between them</p>
+<p>Same direction: θ = 0°, <strong>cos θ = 1</strong></p>
+<p>At right angles: θ = 90°, <strong>cos θ = 0</strong>. Unrelated</p>
+<p>Opposite: θ = 180°, <strong>cos θ = −1</strong></p>
+<p>B twice as long, same angle: cos θ does not move. <strong>Only the directions count</strong></p>
+</div>
+
+<aside class="notes" data-markdown>
+Defines “similarity” before any formula: only the angle counts, the lengths do not.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Cosine from coordinates</h1>
+
+<div class="la" data-la="cosine-xy">
+<p>Two vectors <strong>A = (3, 1)</strong> and <strong>B = (2, 5)</strong>, at angles a and b from the axis: θ = b − a</p>
+<p>Divide each by its length: <strong>$\hat A$</strong> and <strong>$\hat B$</strong> land on the unit circle. Their coordinates are the cos and sin of their angles</p>
+<p>Project $\hat B$ onto $\hat A$: the foot is at distance <strong>cos θ</strong> from the origin</p>
+<p><strong>cos θ = cos(b − a)</strong>, expanded with a trigonometric identity</p>
+<p>Replace $\cos a$ by $\frac{a_1}{\|A\|}$, $\sin a$ by $\frac{a_2}{\|A\|}$, and the same for b</p>
+<p>Put it over one denominator: <strong>$\cos\theta = \frac{a_1 b_1 + a_2 b_2}{\|A\|\,\|B\|}$</strong> = 0.65</p>
+</div>
+
+<aside class="notes" data-markdown>
+Whiteboard construction: shrink A and B onto the unit circle, project B̂ onto Â, then cos(b − a) = cos a cos b + sin a sin b and substitute the coordinates.
+
+The numerator a₁b₁ + a₂b₂ comes back two slides later: it is the dot product.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Dot product: multiply, then add</h1>
+
+<div class="la" data-la="dot">
+<p>Two vectors of the same size, here <strong>d = 4</strong></p>
+<p>Multiply the first entries: 2 × 1 = <strong>2</strong></p>
+<p>then the second ones: 1 × 3 = <strong>3</strong></p>
+<p>the third: −1 × 2 = <strong>−2</strong>. Opposite signs pull the sum down</p>
+<p>the fourth: 3 × 1 = <strong>3</strong></p>
+<p>Add the products: <strong>$a \cdot b = \sum_i a_i b_i = 6$</strong></p>
+<p>Two vectors in, <strong>one number</strong> out</p>
+</div>
+
+<aside class="notes" data-markdown>
+Two vectors of the same size in, one number out.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Dot product and cosine</h1>
+
+<div class="la" data-la="dot-cosine">
+<p>In 2-D, the numerator of cos θ is the dot product: <strong>$a_1 b_1 + a_2 b_2 = A \cdot B$</strong></p>
+<p>So <strong>$\cos\theta = \frac{A \cdot B}{\|A\|\,\|B\|}$</strong>: the dot product carries the angle and both lengths</p>
+<p>Same direction: both at their largest</p>
+<p>At right angles: both 0</p>
+<p>Pointing away: both negative</p>
+<p>Same angle, B twice as long: <strong>cos θ does not move, A · B doubles</strong></p>
+<p>Both of length 1: <strong>$\hat A \cdot \hat B = \cos\theta$</strong>. Cosine reads the angle; the dot product reads angle and lengths</p>
+</div>
+<script src="themes/linalg.js"></script>
+
+<aside class="notes" data-markdown>
+Attention scores are raw dot products (scaled by √d_h): a long key can win with a mediocre angle.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>Predicting Similarity</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Next-token probability from Transformer stacks</h1>
+
+<div class="viz" data-anim="decoding" data-vocab="100000" data-scale="1.1"
+     data-tokens="Paris:60704 ␣is:374 ␣the:279 ␣capital:6864"
+     data-generated="␣of:315 ␣France:9822 &lt;|endoftext|&gt;:100257"
+     data-score-cols="12" data-sweep="3">
+<p>Input: a text</p>
+<p><strong>Tokenize</strong>: cut the text into tokens</p>
+<p>Each token has an <strong>id</strong> in a vocabulary of V = 100 000 tokens</p>
+<p><strong>Embed</strong>: id 60704 selects row 60704 of W<sub>E</sub></p>
+<p>id 374 selects row 374</p>
+<p>id 279 selects row 279</p>
+<p>id 6864 selects row 6864 · one vector of d numbers per token</p>
+<p><strong>Transformer block 1</strong></p>
+<p><strong>Transformer block 2</strong>: same shape, new values</p>
+<p>… <strong>L blocks</strong> in total</p>
+<p><strong>Unembed</strong>: similarity[4, 0] = row 4 of h<sub>L</sub> · row 0 of W<sub>U</sub></p>
+<p>similarity[3, 0] = row 3 of h<sub>L</sub> · row 0 of W<sub>U</sub></p>
+<p>similarity[2, 0] = row 2 of h<sub>L</sub> · row 0 of W<sub>U</sub></p>
+<p>similarity[1, 0] = row 1 of h<sub>L</sub> · row 0 of W<sub>U</sub>: the first column is done</p>
+<p>… and so on for every row of W<sub>U</sub></p>
+<p>Greedy decoding: <strong>argmax</strong> keeps the largest similarity of each row</p>
+<p>Only the <strong>last</strong> prediction is new: 315 = « ␣of »</p>
+<p><strong>Append</strong> it to the input: n = 5, and start again</p>
+<p><strong>Embed</strong> new token</p>
+<p><strong>L transformer blocks</strong></p>
+<p><strong>Unembed</strong></p>
+<p>Largest similarity of the last row: 9822 = « ␣France »</p>
+<p><strong>Append</strong> it to the input: n = 6, and start again</p>
+<p><strong>Embed</strong> new token</p>
+<p><strong>L transformer blocks</strong></p>
+<p><strong>Unembed</strong></p>
+<p>Largest similarity of the last row: 100257 = « &lt;|endoftext|&gt; », a special token. <strong>Stop</strong> generation</p>
+</div>
+<script src="themes/decoding.js"></script>
+
+<aside class="notes" data-markdown>
+Unembedding similarity is dot product, mostly because it's a measure of how far apart two vectors are in
+the d dimensional space. cosine similarity would work maybe but it too expensive to calculate
+(it's a dot product over normalized vectors so, you need to normalize and to normalize, you need to
+calculate squares, etc.)
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Layer by layer, « France » pulls ahead</h1>
+
+<style>
+/* figure by tools/lens_slide.py (themes/lens.svg): plot + stack grouped by top-1 token; hover a point for its numbers */
+.lp { display: flex; }
+.lp .figure { flex: none; }
+.lp-cap { font-size: 20px; color: var(--cutebugs-slate); margin: -.4em 0 .5em !important; }
+</style>
+
+<p class="lp-cap">« The city of Paris is the capital of » · Qwen3-1.7B, 28 layers · after each layer, unembed the last vector</p>
+<div class="lp" data-steps="8">
+<object class="figure" type="image/svg+xml" data="themes/lens.svg?v=3bda696f" width="1136" height="450"></object>
+</div>
+<script src="themes/lens.js"></script>
+
+<aside class="notes" data-markdown>
+Slowly, as we cross more transformer layers, we see the model converging towards a
+geographical location: city, cities, postalcode, eventually reaching
+country, and then, france.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>The Transformer black box</h1>
+
+<div class="viz" data-anim="transformer" data-scale="1.6"
+     data-tokens="Paris ␣is ␣the ␣capital">
+<p>A transformer block: two sub-blocks</p>
+<p><strong>Attention</strong> mixes tokens causally: it works along <strong>n</strong></p>
+<p>The first row only sees <strong>Paris</strong>: never the future.</p>
+<p>row 2 mixes <strong>Paris</strong> and <strong>is</strong></p>
+<p>row 3 mixes <strong>Paris</strong>, <strong>is</strong>, and <strong>the</strong></p>
+<p>row 4 mixes <strong>Paris</strong>, <strong>is</strong>, <strong>the</strong> and <strong>capital</strong></p>
+<p><strong>FFN</strong> transforms each row on its own: it works along <strong>d</strong></p>
+<p>Output row 1 depends only on row 1</p>
+<p>Output row 2 depends only on row 2</p>
+<p>Output row 3 depends only on row 3</p>
+<p>Same processing for every row: rows never interact</p>
+</div>
+<script src="themes/transformer.js"></script>
+
+<aside class="notes" data-markdown>
+The real magic happens in the Transformer and more specifically in the Attention sub-block of the transformer
+that is responsible for learning the cross-position relationships
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Self-Attention, one Head</h1>
+
+<style>
+/* figure by tools/qkv_slide.py (themes/qkv.svg), steps by themes/qkv.js */
+.qk { position: relative; }
+.qk .figure { display: block; margin-top: -18px; }
+.qk-caps { display: grid; margin-top: 2px; }
+.qk-caps > p {
+  grid-area: 1 / 1; margin: 0 !important; font-size: 23px; line-height: 1.3;
+  background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-blue); padding: 12px 22px;
+  transition: opacity .3s;
+}
+.qk-caps > p.is-off { opacity: 0; }
+</style>
+
+<div class="qk" data-steps="6">
+<object class="figure" type="image/svg+xml" data="themes/qkv.svg?v=ad3ad53d" width="1136" height="452"></object>
+<div class="qk-caps">
+<p>Each token is a vector <strong>x</strong>: everything the model knows about it so far</p>
+<p>Build a question (q for query) from « of »: <strong>“is it a city?”</strong></p>
+<p>Build an answer (k for key) from every token: its <strong>“cityness”</strong></p>
+<p>q and k have high similarity (<strong>85 %</strong>) for Paris</p>
+<p>Build a payload (v for value) from every token: <strong>what it offers</strong></p>
+<p>Each value is weighted by how well its key matched with the query, then summed</p>
+<p>The result is added to « of »: it now carries <strong>“France”</strong></p>
+</div>
+</div>
+<script src="themes/qkv.js"></script>
+
+<aside class="notes" data-markdown>
+Intuitively, each vector becomes a linear combination of relevant parts of previous relevant tokens
+
+1. read relevent dimensions of each input vector to ask a question: "Is City ?"
+2. read relevant dimensions of each input vector to answer a question: "City-ness"
+3. Calculate attention weights a_i : for each input vector Q_i, how well does input input vector K_j (j&lt;=i) answer the question ? "This is a city"
+4. read relevant dimensions of each input vector: "Country of city"
+5. Weight "Country of city" by "This is a a city"
+6. write back "Country" dimensions
+
+Figure: Qwen3-1.7B, layer 21, head 13. Real: the x strips, the arc weights (sink « The »
+left out, others renormalized), the words under the values (top unembedded token of
+W_O v). Cartoon: the bright peaks on q, k and v.
+
+The following are equations presented in the attention equation slide. We want to make sure we reference
+the intuitive explanation from the actual equations on the equation slide.
+
+1. W_Q -&gt; Q
+2. W_K -&gt; K
+3. Q_i . K_j -&gt; z_i (Q.KT)
+4. W_V -&gt; V
+5. z = a_i x V_i
+6. O=W_O . z
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>How « France » is built</h1>
+
+<style>
+/* figure by tools/attn_slide.py (themes/attn.svg), steps by themes/attn.js: one lens group per key */
+.am .figure { display: block; }
+.am-cap { font-size: 20px; color: var(--cutebugs-slate); margin: -.4em 0 .5em !important; }
+</style>
+
+<p class="am-cap">« The city of Paris is the capital of » · Qwen3-1.7B · what <strong>␣of</strong> reads from each earlier token, one row per layer</p>
+<div class="am" data-steps="8">
+<object class="figure" type="image/svg+xml" data="themes/attn.svg?v=a2be06a8" width="1136" height="450"></object>
+</div>
+<script src="themes/attn.js"></script>
+
+<aside class="notes" data-markdown>
+This is a heatmap of attention across layers and attention heads.
+It helps understand what input dimensions of what input position
+the output is built from. On the right, the stack of the logit-lens
+slide: each key reveals one group of layers (same top-1 token) and
+its rows in the heatmap.
+
+Takeaways: layers 1-3 heavily read « capital »; layers 7-21 read « Paris ».
+
+- First, in layers 1-3, we observe that we are reading from all dimensions
+  of the capital position. Presumably, Q=K=subject-of, and V=capital
+  the next token is going to be a "country"
+
+- Second, we observe that we are consistently reading from a few specific
+  dimensions in the paris position. Presumably, it means that paris is
+  a city/capital (Q=K=cityness), and that we are reading its country
+  dimensions (V=country of city) to build france from layer 7 up to 21.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section data-section>
+<h1>Conclusion</h1>
+
+<ul>
+<li>An LLM calculates next-token probabilities</li>
+<li>Probabilities are derived from dot product similarity</li>
+</ul>
+</section>
+
+</div>
+</div>
+<script src="vendor/reveal/reveal.js"></script>
+<script src="vendor/reveal/notes.js"></script>
+<script src="themes/deck.js"></script>
+<!-- followers follow on their laptops: press L to pick the channel + QR (themes/sync-qr.js) -->
+<script src="themes/sync.js" data-topic-base="inria-llm" data-deck="next-word-prediction" data-follower="follower.html"></script>
+<script src="themes/sync-qr.js"></script>
+</body>
+</html>

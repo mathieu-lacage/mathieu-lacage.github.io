@@ -1,0 +1,23 @@
+/* « Flash-attention: a tiling case study » (themes/flash.js): each figure is an SVG in slide
+   coordinates over the whole slide, under the title. */
+.flash { position: absolute; inset: 0; pointer-events: none; }
+.flash > svg { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
+.flash svg text { font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; letter-spacing: normal; }
+/* the matrices of « Tiling a matrix product » */
+.flash svg .cell { fill: #0f1829; stroke: var(--cutebugs-dim); stroke-width: 1.5; transition: fill .15s; }
+.flash svg .cell.res { fill: #23406a; }
+.flash svg .cell.load, .flash svg .cell.cur { fill: var(--cutebugs-red); }
+.flash svg .cell.done { fill: #2b5a3a; }
+@media (prefers-reduced-motion: reduce) { .flash svg .cell { transition: none; } }
+
+/* the table next to them: one row per tiling, the current one in gold */
+.flash .flash-box { position: absolute; letter-spacing: 0; font-size: 22px; line-height: 1.35; }
+.flash .flash-flops { margin: 0 0 10px; font-size: 20px; color: var(--cutebugs-slate); }
+.flash .flash-flops i { font-family: 'Times New Roman', 'STIX Two Text', serif; }
+.flash table.flash-tab { border-collapse: collapse; margin: 0; font-size: 20px; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.flash .flash-tab th { font-family: 'IBM Plex Sans Condensed', 'Helvetica Neue', Arial, sans-serif; font-size: 15px; font-weight: 400;
+  color: var(--cutebugs-slate); text-transform: uppercase; letter-spacing: .06em; text-align: left; padding: 0 28px 6px 0; border-bottom: 1px solid var(--cutebugs-dim); }
+.flash .flash-tab td { padding: 6px 28px 6px 0; border-bottom: 1px solid #313949; white-space: nowrap; }
+.flash .flash-tab :is(td, th):nth-child(n+2) { text-align: right; }
+.flash .flash-tab :is(td, th):last-child { padding-right: 0; }
+.flash .flash-tab tr.on td { color: var(--cutebugs-red); }

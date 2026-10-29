@@ -1,0 +1,27 @@
+/* « Prefill is compute-bound » (themes/cost.js): each figure is an SVG in slide coordinates
+   over the whole slide, under the title. */
+.cost { position: absolute; inset: 0; pointer-events: none; }
+.cost > svg { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; }
+.cost svg text { font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; letter-spacing: normal; }
+/* the matrices of « Complexity of matrix product » */
+.cost svg .cell { fill: #0f1829; stroke: var(--cutebugs-dim); stroke-width: 1.5; transition: fill .2s; }
+.cost svg .cell.row { fill: #23406a; }
+.cost svg .cell.on { fill: var(--cutebugs-red); }
+@media (prefers-reduced-motion: reduce) { .cost svg .cell { transition: none; } }
+
+/* « Prefill: one block, product by product »: formulas only, one row per operation */
+section .costtab { width: 100%; table-layout: fixed; margin: 0; font-size: 21px; line-height: 1.1; }
+section .costtab th { font-family: 'IBM Plex Sans Condensed', 'Helvetica Neue', Arial, sans-serif; font-size: 16px; font-weight: 400;
+  color: var(--cutebugs-slate); text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--cutebugs-dim); padding: 0 8px 6px; }
+section .costtab td { height: 38px; padding: 0 8px; border-bottom: 1px solid #313949; white-space: nowrap; }
+section .costtab :is(th, td):nth-child(n+3) { text-align: right; }
+section .costtab td:first-child { box-shadow: inset 4px 0 var(--c, var(--cutebugs-dim)); padding-left: 14px; }
+section .costtab td.el { color: var(--cutebugs-slate); font-size: 17px; }
+section .costtab td.zero { color: var(--cutebugs-dim); }
+section .costtab tr.cost-att { --c: var(--cutebugs-blue); }
+section .costtab tr.cost-mix { --c: var(--cutebugs-magenta); }
+section .costtab tr.cost-ffn { --c: var(--cutebugs-green); }
+section .costtab tr.cost-oth { --c: var(--cutebugs-slate); }
+section .costtab tr.cost-sum td { border-top: 2px solid var(--cutebugs-slate); border-bottom: 0; --c: var(--cutebugs-red); }
+section .costtab td mjx-container { font-size: 100%; }
+section .costtab td.hot { color: var(--cutebugs-red); }

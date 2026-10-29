@@ -1,0 +1,231 @@
+/* Auto-regressive decoding animation, built by decoding.js.
+   decoding.js toggles .is-off (hidden), .is-hl (highlighted) and .is-dim (dimmed)
+   on .viz-v elements at every step; everything below just styles those states. */
+.viz { position: absolute; left: 72px; top: 150px; width: 1136px; height: 500px; }
+.viz-v {
+  transition: opacity .5s ease, max-width .6s ease, max-height .5s ease, margin .5s ease, padding .6s ease,
+    outline-color .3s ease, color .3s ease, border-color .3s ease, background-color .3s ease;
+}
+.viz-v.is-dim { opacity: .3; }
+.viz-v.is-off { opacity: 0; }
+/* collapse horizontally / vertically when hidden, so neighbours slide in */
+.viz-cw { max-width: 420px; padding-inline: 4px; overflow-x: clip; }
+.viz-cw.is-off { max-width: 0; padding-inline: 0; }
+.viz-ch { max-height: 26px; margin-block: 2px; }
+.viz-ch.is-off { max-height: 0; margin-block: 0; }
+
+.viz-prompt {
+  position: absolute; left: 0; top: 0; width: 1136px; height: 56px; box-sizing: border-box;
+  display: flex; align-items: center; padding: 0 20px; white-space: nowrap;
+  background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-blue);
+  outline: 3px solid transparent; outline-offset: 4px;
+}
+.viz-prompt.is-hl { outline-color: var(--cutebugs-red); }
+.viz-prompt .viz-chip { font-size: 28px; line-height: 34px; margin-right: 4px; transition: border-color .4s ease; }
+.viz-prompt .viz-chip i { transition: border-color .4s ease, color .4s ease; }
+.viz-prompt .viz-cw { padding-inline: 0; }
+.viz-prompt .viz-new { color: var(--cutebugs-red-dark); font-weight: 600; }
+/* before tokenization the prompt is plain text */
+.viz:not(.is-tokenized) .viz-prompt .viz-chip { border-color: transparent; }
+.viz:not(.is-tokenized) .viz-prompt .viz-chip i { border-left-color: transparent; }
+.viz:not(.is-tokenized) .viz-prompt .viz-sp { color: transparent; }
+.viz-cursor { color: var(--cutebugs-slate); margin-left: 4px; font-size: 28px; animation: viz-blink 1s steps(1) infinite; }
+@keyframes viz-blink { 50% { opacity: 0; } }
+
+/* one token = a strip of character cells (leading space drawn as ␣) + its id */
+.viz-chip {
+  display: inline-flex; font-family: 'IBM Plex Mono', monospace; font-size: 18px; line-height: 20px;
+  border: 2px solid var(--cutebugs-blue); border-radius: 4px;
+}
+.viz-chip i { font-style: normal; padding: 0 1px; }
+.viz-chip i + i { border-left: 1px solid var(--cutebugs-dim); }
+.viz-sp { color: var(--cutebugs-slate); }
+.viz-chip.viz-special { border-style: dashed; }
+.viz-chip.viz-special i { font-size: .64em; padding: 0 2px; }
+.viz-tr { display: flex; align-items: center; column-gap: 4px; height: 26px; }
+.viz-cc { width: 116px; flex: none; }
+.viz-id { width: 66px; flex: none; font-family: 'IBM Plex Mono', monospace; font-size: 18px; text-align: right; white-space: nowrap; }
+.viz-idfirst { column-gap: 10px; }
+.viz-pk .viz-chip, .viz-pk .viz-id { transition: color .3s ease, border-color .3s ease; }
+.viz-pk.is-hl .viz-chip { border-color: var(--cutebugs-red); color: var(--cutebugs-red); }
+.viz-pk.is-hl .viz-id { color: var(--cutebugs-red); }
+
+/* processing blocks stay once introduced; data matrices only show around the current block */
+.viz-strip { position: absolute; left: 0; top: 78px; width: 1136px; height: 330px; display: flex; align-items: center; justify-content: center; }
+.viz-it { display: flex; align-items: center; flex: none; }
+.viz-ar { flex: none; width: 14px; height: 12px; margin-right: 4px; overflow: visible; }
+.viz-ar path { fill: none; stroke: var(--cutebugs-slate); stroke-width: 2; }
+.viz-mx { display: flex; align-items: stretch; }
+.viz-mb { position: relative; display: flex; flex-direction: column; justify-content: center; }
+.viz-nm { position: absolute; top: calc(100% + 8px); left: 50%; translate: -50% 0; font-size: 18px; color: var(--cutebugs-slate); white-space: nowrap; }
+
+/* a row of d numbers: a dark overlay of varying strength over a base colour */
+.viz-r {
+  width: 84px; height: 26px; box-sizing: border-box; position: relative; background-color: var(--cutebugs-blue);
+  background-image: var(--viz-heat);
+  --viz-heat: repeating-linear-gradient(90deg, rgba(15,24,41,0) 0 12px, rgba(15,24,41,.55) 12px 24px,
+    rgba(15,24,41,.2) 24px 36px, rgba(15,24,41,.7) 36px 48px, rgba(15,24,41,.35) 48px 60px,
+    rgba(15,24,41,.1) 60px 72px, rgba(15,24,41,.6) 72px 84px);
+  outline: 3px solid transparent; outline-offset: -3px;
+  margin-block: 2px;  /* same spacing for every matrix, collapsing rows included (.viz-ch) */
+}
+.viz-r.is-hl { outline-color: var(--cutebugs-red); }
+.viz-r:nth-child(2) { background-position-x: 24px; }
+.viz-r:nth-child(3) { background-position-x: 48px; }
+.viz-r:nth-child(4) { background-position-x: 12px; }
+.viz-r:nth-child(5) { background-position-x: 60px; }
+.viz-h1 .viz-r { background-color: #6d86ff; }  /* base colour shifts block after block: new values */
+.viz-h2 .viz-r { background-color: #a46cf5; }
+.viz-hL .viz-r { background-color: #e46fd6; }
+/* scores (n, V), drawn as n × C cells: the first column fills one cell per step, then the
+   sweep fills the rest column by column, bottom to top; --d staggers each cell's appearance */
+.viz-sc .viz-r { display: flex; width: 100px; background-color: #141d30; background-image: none; box-shadow: inset 0 0 0 1px var(--cutebugs-dim); }
+.viz-c { flex: 1; background: rgba(142, 149, 162, var(--a)); box-shadow: inset 0 0 0 .5px #0f1829; }
+.viz-c.viz-v { transition: opacity .25s ease var(--d, 0s), background-color .3s ease; }
+.viz-c.is-off { transition-delay: 0s; }
+.viz-c.is-hl { background: var(--cutebugs-red); }
+.viz-arg { position: absolute; top: -2px; bottom: -2px; box-sizing: border-box; border: 2px solid var(--cutebugs-red); }
+/* during the sweep the W_U band steps down one slice per column, then goes away once the
+   last column is filled (h_L rows: keyframes from decoding.js) */
+.viz-band.viz-sweep.is-anim { animation-name: viz-band-sweep, viz-band-done; animation-fill-mode: forwards; }
+@keyframes viz-band-sweep { from { top: var(--t0); } to { top: var(--t1); } }
+@keyframes viz-band-done { to { opacity: 0; } }
+
+/* a (V, d) weight matrix: many thin rows */
+.viz-w {
+  position: relative; width: 44px; height: 200px; box-sizing: border-box; border: 2px solid var(--cutebugs-blue);
+  background: repeating-linear-gradient(180deg, var(--cutebugs-dim) 0 2px, transparent 2px 5px);
+}
+.viz-wu { border-color: var(--cutebugs-green); }
+.viz-band { position: absolute; left: -5px; right: -5px; height: 4px; margin-top: -1px; background: var(--cutebugs-red); }
+.viz-blk {
+  width: 36px; height: 180px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  font-size: 19px; background: var(--cutebugs-panel); border: 2px solid var(--cutebugs-blue);
+  writing-mode: vertical-rl; transform: rotate(180deg);
+}
+/* items clip horizontally (to collapse), so the current block highlights inside its box */
+.viz-blk.is-hl { border-color: var(--cutebugs-red); background-color: #34476e; }
+.viz-w.is-hl { border-color: var(--cutebugs-red); background-color: rgba(52, 71, 110, .4); }  /* keep the row stripes visible */
+.viz-dots { font-size: 30px; color: var(--cutebugs-slate); }
+
+/* curly braces: empty SVGs, braces.js draws a path fitted to their size */
+.viz-lb { display: flex; align-items: center; gap: 4px; }
+.viz-lb.viz-cw { padding-inline: 0; margin-right: 6px; }
+.viz-lb.viz-cw.is-off { margin-right: 0; }
+.viz-bl { display: grid; justify-items: end; }
+.viz-bl > * { grid-area: 1 / 1; }
+.viz-lab { font-size: 22px; font-style: italic; color: var(--cutebugs-cyan); }
+.viz-bw { position: relative; flex: none; }
+.viz-lb .viz-bw { align-self: stretch; width: 14px; }
+.viz-tb .viz-bw { width: 100%; height: 14px; }
+.viz-brace { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.viz-brace path { fill: none; stroke: var(--cutebugs-cyan); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.viz-tb { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); display: flex; flex-direction: column; align-items: center; }
+
+.viz-caps { position: absolute; left: 0; top: 430px; width: 1136px; display: grid; font-size: 25px; }
+/* !important: win over the theme's section p and section code rules */
+.viz-caps > p { grid-area: 1 / 1; margin: 0 !important; }
+.viz-caps code {
+  font-family: 'IBM Plex Mono', monospace; font-size: .84em;
+  color: var(--cutebugs-cyan) !important; background: none !important; padding: 0 !important;
+}
+
+/* ---- transformer.js: inside one block ---- */
+.viz[data-anim="transformer"] .viz-strip { top: 30px; height: 370px; }
+.tb-a .viz-r { background-color: #5a8ef7; }
+.tb-y .viz-r { background-color: #6d86ff; }  /* = h1 of the decoding slide */
+.viz[data-anim="transformer"] .viz-col { margin-right: 10px; }
+/* one fixed layout: hidden braces only fade, they keep their place */
+.viz[data-anim="transformer"] .viz-lb.viz-cw.is-off { max-width: 420px; margin-right: 6px; }
+
+/* ---- attention.js: one head; every product A · B = C has A left of C and B above it ---- */
+.viz[data-anim="attention"] .viz-caps { top: 456px; }  /* below the drawing, above the footer */
+.at-b { position: absolute; box-sizing: border-box; }
+.at-box { outline: 3px solid transparent; outline-offset: 2px; }
+.at-box.is-hl { outline-color: var(--cutebugs-red); }
+/* activations: one row per token, the same dark stripes as .viz-r over a base colour */
+.at-row {
+  position: absolute; left: 0; right: 0; background-image: var(--viz-heat);
+  --viz-heat: repeating-linear-gradient(90deg, rgba(15,24,41,0) 0 12px, rgba(15,24,41,.55) 12px 24px,
+    rgba(15,24,41,.2) 24px 36px, rgba(15,24,41,.7) 36px 48px, rgba(15,24,41,.35) 48px 60px,
+    rgba(15,24,41,.1) 60px 72px, rgba(15,24,41,.6) 72px 84px);
+  outline: 3px solid transparent; outline-offset: -3px;
+}
+.at-row.is-hl, .at-col.is-hl, .at-cell.is-hl, .at-bar.is-hl { outline-color: var(--cutebugs-red); }
+/* a copy of x: faded, inside a dashed outline */
+.at-ghost > .at-row { opacity: .45; }
+.at-ghost::after { content: ''; position: absolute; inset: -4px; border: 1.5px dashed var(--cutebugs-slate); }
+/* weights: many thin rows, as .viz-w */
+.at-w { border: 2px solid var(--cutebugs-blue); background: repeating-linear-gradient(180deg, var(--cutebugs-dim) 0 2px, transparent 2px 5px); }
+.at-w.is-hl { border-color: var(--cutebugs-red); background-color: rgba(52, 71, 110, .4); }
+/* Kᵀ: one column per token */
+.at-col {
+  position: absolute; top: 0; bottom: 0; outline: 3px solid transparent; outline-offset: -3px;
+  background: repeating-linear-gradient(180deg, rgba(15,24,41,.55) 0 2px, transparent 2px 5px) var(--cutebugs-green);
+}
+/* n × n: empty outlines, masked (hatched) cells, value cells */
+.at-cell { position: absolute; box-sizing: border-box; outline: 3px solid transparent; outline-offset: -3px; }
+.at-empty { border: 1px solid var(--cutebugs-dim); }
+.at-mask { border: 1px solid #2a3650; background: repeating-linear-gradient(45deg, #2a3650 0 2px, transparent 2px 7px); }
+.at-nm {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%; font-size: 22px; font-weight: 600; line-height: 1;
+  white-space: nowrap; color: var(--cutebugs-ink); text-shadow: 0 0 3px #0f1829, 0 0 3px #0f1829, 0 0 6px #0f1829;
+}
+.at-tri .at-nm { left: 70%; top: 28%; font-size: 19px; }
+/* operations (transpose, softmax) are ellipses */
+.at-op {
+  display: flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1;
+  border: 2px solid var(--cutebugs-ink); border-radius: 50%; background: #0f1829;
+}
+.at-op.is-hl { border-color: var(--cutebugs-red); color: var(--cutebugs-red); }
+.at-wires { position: absolute; left: -72px; top: -150px; width: 1280px; height: 720px; overflow: visible; pointer-events: none; }
+.at-wires marker path { fill: var(--cutebugs-slate); }
+.at-wire { fill: none; stroke: var(--cutebugs-slate); stroke-width: 2; }
+.at-wire.is-hl { stroke: var(--cutebugs-red); }
+.at-dash { stroke-dasharray: 6 5; }
+/* dimension braces, labels outside */
+.at-bl { position: absolute; font-size: 20px; font-style: italic; line-height: 1; white-space: nowrap; color: var(--cutebugs-cyan); }
+.at-bl-left { right: calc(100% + 6px); top: 50%; translate: 0 -50%; }
+.at-bl-right { left: calc(100% + 6px); top: 50%; translate: 0 -50%; }
+.at-bl-top { bottom: calc(100% + 3px); left: 50%; translate: -50% 0; }
+.at-bl-bottom { top: calc(100% + 3px); left: 50%; translate: -50% 0; }
+/* the last row's scores and softmax, under the title */
+.at-t { font-size: 17px; line-height: 26px; white-space: nowrap; text-align: center; transition-property: opacity, color; }
+.at-tt { font-size: 19px; text-align: left; }
+.at-th { font-size: 16px; line-height: 22px; color: var(--cutebugs-slate); }
+.at-left { text-align: left; }
+.at-tok { font-family: 'IBM Plex Mono', monospace; color: var(--cutebugs-slate); text-align: right; }
+.at-sc { font-family: 'IBM Plex Mono', monospace; font-size: 19px; }
+.at-sc.is-hl { color: var(--cutebugs-red); }
+.at-bar { background: var(--viz-heat) var(--cutebugs-cyan); outline: 3px solid transparent; outline-offset: -3px;
+  --viz-heat: repeating-linear-gradient(90deg, rgba(15,24,41,0) 0 12px, rgba(15,24,41,.4) 12px 24px); }
+.at-pct { font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: var(--cutebugs-slate); text-align: left; }
+
+/* ---- heads.js: H heads cut out of one projection (reuses the attention.js styles) ---- */
+.viz[data-anim="heads"] .viz-caps { top: 456px; }
+/* head slices: thin dark cuts between them, outlined when in use */
+.hd-sl { position: absolute; box-sizing: border-box; outline: 3px solid transparent; outline-offset: -3px; }
+.hd-sl.hd-cut { border-left: 2px solid #0f1829; }
+.hd-sl.hd-cut.hd-rows { border-left: 0; border-top: 2px solid #0f1829; }
+.at-w .hd-sl.hd-cut { border-color: var(--cutebugs-blue); }
+.hd-sl.is-hl { outline-color: var(--cutebugs-red); }
+/* one column per head, its name underneath; the dotted rail carries x to every head */
+.hd-panel { border: 1.5px solid rgba(143,197,250,.22); border-radius: 10px; background: rgba(143,197,250,.045); }
+.hd-panel.is-hl { border-color: var(--cutebugs-red); }
+.hd-ht { position: absolute; left: 0; right: 0; top: calc(100% + 10px); text-align: center; font-size: 17px; line-height: 1;
+  font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--cutebugs-slate); }
+.hd-rail { border-top: 2px dotted var(--cutebugs-dim); }
+/* a slice of W_Q, W_K or W_V (top strip in the colour of Q, K or V) above its slice of Q, K or V */
+.hd-w { position: absolute; left: 0; top: 0; width: 100%; }
+.hd-w::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 5px; background: var(--hd-c); }
+.hd-act { position: absolute; left: 0; right: 0; }
+/* slices that touch their neighbours: the highlight goes inside, over the content */
+.at-box.hd-in { outline: none; }
+.at-box.hd-in::after { content: ''; position: absolute; inset: 0; border: 3px solid transparent; transition: border-color .5s ease; }
+.at-box.hd-in.is-hl::after { border-color: var(--cutebugs-red); }
+.hd-mv.viz-v { transition: opacity .5s ease, translate .9s cubic-bezier(.6, .05, .3, 1); }
+.at-nm.hd-sm { font-size: 17px; }
+/* W_Q^(1): superscript stacked over subscript */
+.hd-ss { display: inline-flex; flex-direction: column; font-size: 62%; line-height: 1; vertical-align: .5em; margin-left: 1px; }
+/* O: one layer per head */
+.hd-layer, .hd-fill { position: absolute; inset: 0; }

@@ -1,0 +1,293 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1136 450" width="1136" height="450">
+<style><![CDATA[
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap');
+svg { --cutebugs-red: #f5c451; --cutebugs-red-dark: #f5c451; --cutebugs-magenta: #d97fd0; --cutebugs-blue: #4aa8ff; --cutebugs-cyan: #8fc5fa; --cutebugs-green: #7cc47a; --cutebugs-orange: #ff9f43; --cutebugs-slate: #8e95a2; --cutebugs-ink: #e3e9f3; --cutebugs-panel: #18233a; --cutebugs-dim: #3d4a63; font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; }
+.lp-win { fill: var(--cutebugs-green); fill-opacity: .2; }
+.lp-grid { stroke: var(--cutebugs-dim); stroke-width: 1; stroke-opacity: .5; }
+.lp-frame { fill: none; stroke: var(--cutebugs-dim); stroke-width: 1.5; }
+.lp-diag { stroke: var(--cutebugs-green); stroke-width: 2; stroke-dasharray: 8 6; }
+.lp-wins { fill: var(--cutebugs-green); font-size: 20px; font-weight: 600; }
+.lp-minor { stroke: var(--cutebugs-slate); stroke-width: 1; }
+.lp-tick { fill: var(--cutebugs-slate); font-size: 17px; }
+.lp-axis { fill: var(--cutebugs-ink); font-size: 19px; }
+.lp-path { fill: none; stroke: var(--cutebugs-slate); stroke-opacity: .6; stroke-width: 1.5; }
+.is-off { display: none; }
+.lp-pt { cursor: default; }
+.lp-pt circle { fill: var(--c); stroke: #0f1829; stroke-width: 1.5; }
+.lp-pt circle.lp-hit { fill: transparent; stroke: none; }
+.lp-pt.is-cur circle:not(.lp-hit) { stroke: var(--cutebugs-ink); stroke-width: 3; }
+.lp-pt text { fill: var(--c); font-size: 14px; font-weight: 600; paint-order: stroke; stroke: #0f1829; stroke-width: 4px; }
+.lp-lbl { fill: var(--cutebugs-slate); font-size: 15px; }
+.lp-ink { fill: var(--cutebugs-ink); font-size: 19px; }
+.lp-x { fill: var(--cutebugs-blue); fill-opacity: .35; }
+.lp-stream { stroke: var(--cutebugs-ink); stroke-opacity: .5; stroke-width: 2; }
+.lp-seg rect { fill: var(--cutebugs-panel); stroke: var(--cutebugs-blue); stroke-width: 1; }
+.lp-seg.is-cur rect { stroke: var(--cutebugs-red); stroke-width: 2; }
+.lp-seg circle { fill: var(--cutebugs-blue); }
+.lp-rng { fill: var(--cutebugs-slate); font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 13px; }
+.lp-name { fill: var(--cutebugs-ink); font-size: 16px; font-weight: 600; }
+.lp-name.lp-fr { fill: var(--cutebugs-red); }
+.lp-name.lp-noise { fill: var(--cutebugs-slate); font-weight: 400; font-style: italic; }
+.lp-wu { fill: url(#lp-wu-tex); stroke: var(--cutebugs-blue); stroke-width: 1.5; }
+.lp-ov { display: none; }
+.lp-ov.is-cur { display: inline; }
+.lp-col.lp-fr { fill: var(--cutebugs-red); }
+.lp-col.lp-ot { fill: var(--cutebugs-cyan); }
+.lp-lead { fill: none; stroke-width: 1.5; }
+.lp-lead.lp-fr { stroke: var(--cutebugs-red); }
+.lp-lead.lp-ot { stroke: var(--cutebugs-cyan); }
+.lp-card rect { fill: var(--cutebugs-panel); stroke-width: 1.5; }
+.lp-card.lp-lead1 rect { stroke-width: 3; }
+.lp-card.lp-fr rect { stroke: var(--cutebugs-red); }
+.lp-card.lp-ot rect { stroke: var(--cutebugs-cyan); }
+.lp-card.lp-fr .lp-badge, .lp-card.lp-fr .lp-tok { fill: var(--cutebugs-red); }
+.lp-card.lp-ot .lp-badge, .lp-card.lp-ot .lp-tok { fill: var(--cutebugs-cyan); }
+.lp-badge { font-size: 11px; font-weight: 600; letter-spacing: .08em; }
+.lp-tok { font-size: 20px; font-weight: 600; }
+.lp-num { fill: var(--cutebugs-ink); font-size: 14px; font-variant-numeric: tabular-nums; }
+
+]]></style>
+<defs><pattern id="lp-wu-tex" width="6" height="40" patternUnits="userSpaceOnUse"><rect width="6" height="40" fill="#18233a"/><rect width="1" height="40" fill="#3d4a63"/></pattern></defs>
+<clipPath id="lp-clip"><rect x="92" y="14" width="550" height="374"/></clipPath>
+<polygon class="lp-win" clip-path="url(#lp-clip)" points="92,14 642,14 642.0,14.0 92.0,188.0 92,188.0"/>
+<line class="lp-grid" x1="92.0" y1="14" x2="92.0" y2="388"/>
+<text class="lp-tick" x="92.0" y="414" text-anchor="middle">10<tspan baseline-shift="super" font-size="13">-4</tspan></text>
+<line class="lp-grid" x1="218.4" y1="14" x2="218.4" y2="388"/>
+<text class="lp-tick" x="218.4" y="414" text-anchor="middle">10<tspan baseline-shift="super" font-size="13">-3</tspan></text>
+<line class="lp-grid" x1="344.9" y1="14" x2="344.9" y2="388"/>
+<text class="lp-tick" x="344.9" y="414" text-anchor="middle">10<tspan baseline-shift="super" font-size="13">-2</tspan></text>
+<line class="lp-grid" x1="471.3" y1="14" x2="471.3" y2="388"/>
+<text class="lp-tick" x="471.3" y="414" text-anchor="middle">10<tspan baseline-shift="super" font-size="13">-1</tspan></text>
+<line class="lp-grid" x1="597.7" y1="14" x2="597.7" y2="388"/>
+<text class="lp-tick" x="597.7" y="414" text-anchor="middle">1</text>
+<line class="lp-grid" x1="92" y1="388.0" x2="642" y2="388.0"/>
+<text class="lp-tick" x="82" y="394.0" text-anchor="end">10<tspan baseline-shift="super" font-size="13">-9</tspan></text>
+<line class="lp-grid" x1="92" y1="348.0" x2="642" y2="348.0"/>
+<text class="lp-tick" x="82" y="354.0" text-anchor="end">10<tspan baseline-shift="super" font-size="13">-8</tspan></text>
+<line class="lp-grid" x1="92" y1="308.0" x2="642" y2="308.0"/>
+<text class="lp-tick" x="82" y="314.0" text-anchor="end">10<tspan baseline-shift="super" font-size="13">-7</tspan></text>
+<line class="lp-grid" x1="92" y1="268.0" x2="642" y2="268.0"/>
+<text class="lp-tick" x="82" y="274.0" text-anchor="end">10<tspan baseline-shift="super" font-size="13">-6</tspan></text>
+<line class="lp-grid" x1="92" y1="228.0" x2="642" y2="228.0"/>
+<text class="lp-tick" x="82" y="234.0" text-anchor="end">10<tspan baseline-shift="super" font-size="13">-5</tspan></text>
+<line class="lp-grid" x1="92" y1="188.0" x2="642" y2="188.0"/>
+<text class="lp-tick" x="82" y="194.0" text-anchor="end">10<tspan baseline-shift="super" font-size="13">-4</tspan></text>
+<line class="lp-grid" x1="92" y1="148.0" x2="642" y2="148.0"/>
+<text class="lp-tick" x="82" y="154.0" text-anchor="end">10<tspan baseline-shift="super" font-size="13">-3</tspan></text>
+<line class="lp-grid" x1="92" y1="108.0" x2="642" y2="108.0"/>
+<text class="lp-tick" x="82" y="114.0" text-anchor="end">10<tspan baseline-shift="super" font-size="13">-2</tspan></text>
+<line class="lp-grid" x1="92" y1="68.0" x2="642" y2="68.0"/>
+<text class="lp-tick" x="82" y="74.0" text-anchor="end">10<tspan baseline-shift="super" font-size="13">-1</tspan></text>
+<line class="lp-grid" x1="92" y1="28.0" x2="642" y2="28.0"/>
+<text class="lp-tick" x="82" y="34.0" text-anchor="end">1</text>
+<line class="lp-minor" x1="130.1" y1="388" x2="130.1" y2="382"/>
+<line class="lp-minor" x1="152.3" y1="388" x2="152.3" y2="382"/>
+<line class="lp-minor" x1="168.1" y1="388" x2="168.1" y2="382"/>
+<line class="lp-minor" x1="180.4" y1="388" x2="180.4" y2="382"/>
+<line class="lp-minor" x1="190.4" y1="388" x2="190.4" y2="382"/>
+<line class="lp-minor" x1="198.9" y1="388" x2="198.9" y2="382"/>
+<line class="lp-minor" x1="206.2" y1="388" x2="206.2" y2="382"/>
+<line class="lp-minor" x1="212.7" y1="388" x2="212.7" y2="382"/>
+<line class="lp-minor" x1="256.5" y1="388" x2="256.5" y2="382"/>
+<line class="lp-minor" x1="278.8" y1="388" x2="278.8" y2="382"/>
+<line class="lp-minor" x1="294.6" y1="388" x2="294.6" y2="382"/>
+<line class="lp-minor" x1="306.8" y1="388" x2="306.8" y2="382"/>
+<line class="lp-minor" x1="316.8" y1="388" x2="316.8" y2="382"/>
+<line class="lp-minor" x1="325.3" y1="388" x2="325.3" y2="382"/>
+<line class="lp-minor" x1="332.6" y1="388" x2="332.6" y2="382"/>
+<line class="lp-minor" x1="339.1" y1="388" x2="339.1" y2="382"/>
+<line class="lp-minor" x1="382.9" y1="388" x2="382.9" y2="382"/>
+<line class="lp-minor" x1="405.2" y1="388" x2="405.2" y2="382"/>
+<line class="lp-minor" x1="421.0" y1="388" x2="421.0" y2="382"/>
+<line class="lp-minor" x1="433.2" y1="388" x2="433.2" y2="382"/>
+<line class="lp-minor" x1="443.3" y1="388" x2="443.3" y2="382"/>
+<line class="lp-minor" x1="451.7" y1="388" x2="451.7" y2="382"/>
+<line class="lp-minor" x1="459.1" y1="388" x2="459.1" y2="382"/>
+<line class="lp-minor" x1="465.5" y1="388" x2="465.5" y2="382"/>
+<line class="lp-minor" x1="509.4" y1="388" x2="509.4" y2="382"/>
+<line class="lp-minor" x1="531.6" y1="388" x2="531.6" y2="382"/>
+<line class="lp-minor" x1="547.4" y1="388" x2="547.4" y2="382"/>
+<line class="lp-minor" x1="559.7" y1="388" x2="559.7" y2="382"/>
+<line class="lp-minor" x1="569.7" y1="388" x2="569.7" y2="382"/>
+<line class="lp-minor" x1="578.2" y1="388" x2="578.2" y2="382"/>
+<line class="lp-minor" x1="585.5" y1="388" x2="585.5" y2="382"/>
+<line class="lp-minor" x1="592.0" y1="388" x2="592.0" y2="382"/>
+<line class="lp-minor" x1="635.8" y1="388" x2="635.8" y2="382"/>
+<line class="lp-minor" x1="92" y1="376.0" x2="98" y2="376.0"/>
+<line class="lp-minor" x1="92" y1="368.9" x2="98" y2="368.9"/>
+<line class="lp-minor" x1="92" y1="363.9" x2="98" y2="363.9"/>
+<line class="lp-minor" x1="92" y1="360.0" x2="98" y2="360.0"/>
+<line class="lp-minor" x1="92" y1="356.9" x2="98" y2="356.9"/>
+<line class="lp-minor" x1="92" y1="354.2" x2="98" y2="354.2"/>
+<line class="lp-minor" x1="92" y1="351.9" x2="98" y2="351.9"/>
+<line class="lp-minor" x1="92" y1="349.8" x2="98" y2="349.8"/>
+<line class="lp-minor" x1="92" y1="336.0" x2="98" y2="336.0"/>
+<line class="lp-minor" x1="92" y1="328.9" x2="98" y2="328.9"/>
+<line class="lp-minor" x1="92" y1="323.9" x2="98" y2="323.9"/>
+<line class="lp-minor" x1="92" y1="320.0" x2="98" y2="320.0"/>
+<line class="lp-minor" x1="92" y1="316.9" x2="98" y2="316.9"/>
+<line class="lp-minor" x1="92" y1="314.2" x2="98" y2="314.2"/>
+<line class="lp-minor" x1="92" y1="311.9" x2="98" y2="311.9"/>
+<line class="lp-minor" x1="92" y1="309.8" x2="98" y2="309.8"/>
+<line class="lp-minor" x1="92" y1="296.0" x2="98" y2="296.0"/>
+<line class="lp-minor" x1="92" y1="288.9" x2="98" y2="288.9"/>
+<line class="lp-minor" x1="92" y1="283.9" x2="98" y2="283.9"/>
+<line class="lp-minor" x1="92" y1="280.0" x2="98" y2="280.0"/>
+<line class="lp-minor" x1="92" y1="276.9" x2="98" y2="276.9"/>
+<line class="lp-minor" x1="92" y1="274.2" x2="98" y2="274.2"/>
+<line class="lp-minor" x1="92" y1="271.9" x2="98" y2="271.9"/>
+<line class="lp-minor" x1="92" y1="269.8" x2="98" y2="269.8"/>
+<line class="lp-minor" x1="92" y1="256.0" x2="98" y2="256.0"/>
+<line class="lp-minor" x1="92" y1="248.9" x2="98" y2="248.9"/>
+<line class="lp-minor" x1="92" y1="243.9" x2="98" y2="243.9"/>
+<line class="lp-minor" x1="92" y1="240.0" x2="98" y2="240.0"/>
+<line class="lp-minor" x1="92" y1="236.9" x2="98" y2="236.9"/>
+<line class="lp-minor" x1="92" y1="234.2" x2="98" y2="234.2"/>
+<line class="lp-minor" x1="92" y1="231.9" x2="98" y2="231.9"/>
+<line class="lp-minor" x1="92" y1="229.8" x2="98" y2="229.8"/>
+<line class="lp-minor" x1="92" y1="216.0" x2="98" y2="216.0"/>
+<line class="lp-minor" x1="92" y1="208.9" x2="98" y2="208.9"/>
+<line class="lp-minor" x1="92" y1="203.9" x2="98" y2="203.9"/>
+<line class="lp-minor" x1="92" y1="200.0" x2="98" y2="200.0"/>
+<line class="lp-minor" x1="92" y1="196.9" x2="98" y2="196.9"/>
+<line class="lp-minor" x1="92" y1="194.2" x2="98" y2="194.2"/>
+<line class="lp-minor" x1="92" y1="191.9" x2="98" y2="191.9"/>
+<line class="lp-minor" x1="92" y1="189.8" x2="98" y2="189.8"/>
+<line class="lp-minor" x1="92" y1="176.0" x2="98" y2="176.0"/>
+<line class="lp-minor" x1="92" y1="168.9" x2="98" y2="168.9"/>
+<line class="lp-minor" x1="92" y1="163.9" x2="98" y2="163.9"/>
+<line class="lp-minor" x1="92" y1="160.0" x2="98" y2="160.0"/>
+<line class="lp-minor" x1="92" y1="156.9" x2="98" y2="156.9"/>
+<line class="lp-minor" x1="92" y1="154.2" x2="98" y2="154.2"/>
+<line class="lp-minor" x1="92" y1="151.9" x2="98" y2="151.9"/>
+<line class="lp-minor" x1="92" y1="149.8" x2="98" y2="149.8"/>
+<line class="lp-minor" x1="92" y1="136.0" x2="98" y2="136.0"/>
+<line class="lp-minor" x1="92" y1="128.9" x2="98" y2="128.9"/>
+<line class="lp-minor" x1="92" y1="123.9" x2="98" y2="123.9"/>
+<line class="lp-minor" x1="92" y1="120.0" x2="98" y2="120.0"/>
+<line class="lp-minor" x1="92" y1="116.9" x2="98" y2="116.9"/>
+<line class="lp-minor" x1="92" y1="114.2" x2="98" y2="114.2"/>
+<line class="lp-minor" x1="92" y1="111.9" x2="98" y2="111.9"/>
+<line class="lp-minor" x1="92" y1="109.8" x2="98" y2="109.8"/>
+<line class="lp-minor" x1="92" y1="96.0" x2="98" y2="96.0"/>
+<line class="lp-minor" x1="92" y1="88.9" x2="98" y2="88.9"/>
+<line class="lp-minor" x1="92" y1="83.9" x2="98" y2="83.9"/>
+<line class="lp-minor" x1="92" y1="80.0" x2="98" y2="80.0"/>
+<line class="lp-minor" x1="92" y1="76.9" x2="98" y2="76.9"/>
+<line class="lp-minor" x1="92" y1="74.2" x2="98" y2="74.2"/>
+<line class="lp-minor" x1="92" y1="71.9" x2="98" y2="71.9"/>
+<line class="lp-minor" x1="92" y1="69.8" x2="98" y2="69.8"/>
+<line class="lp-minor" x1="92" y1="56.0" x2="98" y2="56.0"/>
+<line class="lp-minor" x1="92" y1="48.9" x2="98" y2="48.9"/>
+<line class="lp-minor" x1="92" y1="43.9" x2="98" y2="43.9"/>
+<line class="lp-minor" x1="92" y1="40.0" x2="98" y2="40.0"/>
+<line class="lp-minor" x1="92" y1="36.9" x2="98" y2="36.9"/>
+<line class="lp-minor" x1="92" y1="34.2" x2="98" y2="34.2"/>
+<line class="lp-minor" x1="92" y1="31.9" x2="98" y2="31.9"/>
+<line class="lp-minor" x1="92" y1="29.8" x2="98" y2="29.8"/>
+<line class="lp-minor" x1="92" y1="16.0" x2="98" y2="16.0"/>
+<rect class="lp-frame" x="92" y="14" width="550" height="374"/>
+<line class="lp-diag" x1="92.0" y1="188.0" x2="642.0" y2="14.0"/>
+<text class="lp-wins" x="106" y="58">␣France wins</text>
+<text class="lp-axis" x="367.0" y="442" text-anchor="middle">probability of the best other token</text>
+<text class="lp-axis" transform="translate(20 201.0) rotate(-90)" text-anchor="middle">probability of ␣France</text>
+<line class="lp-path lp-s1" x1="590.9" y1="360.1" x2="488.7" y2="283.6"/>
+<line class="lp-path lp-s2" x1="488.7" y1="283.6" x2="479.8" y2="309.3"/>
+<line class="lp-path lp-s3" x1="479.8" y1="309.3" x2="453.4" y2="273.0"/>
+<line class="lp-path lp-s4" x1="453.4" y1="273.0" x2="454.0" y2="275.8"/>
+<line class="lp-path lp-s5" x1="454.0" y1="275.8" x2="520.6" y2="272.2"/>
+<line class="lp-path lp-s6" x1="520.6" y1="272.2" x2="484.2" y2="168.7"/>
+<line class="lp-path lp-s7" x1="484.2" y1="168.7" x2="523.6" y2="178.1"/>
+<line class="lp-path lp-s8" x1="523.6" y1="178.1" x2="446.7" y2="165.8"/>
+<line class="lp-path lp-s9" x1="446.7" y1="165.8" x2="474.7" y2="140.4"/>
+<line class="lp-path lp-s10" x1="474.7" y1="140.4" x2="560.1" y2="150.0"/>
+<line class="lp-path lp-s11" x1="560.1" y1="150.0" x2="498.1" y2="113.7"/>
+<line class="lp-path lp-s12" x1="498.1" y1="113.7" x2="474.0" y2="124.5"/>
+<line class="lp-path lp-s13" x1="474.0" y1="124.5" x2="511.9" y2="113.2"/>
+<line class="lp-path lp-s14" x1="511.9" y1="113.2" x2="486.0" y2="119.8"/>
+<line class="lp-path lp-s15" x1="486.0" y1="119.8" x2="477.4" y2="116.6"/>
+<line class="lp-path lp-s16" x1="477.4" y1="116.6" x2="506.0" y2="88.5"/>
+<line class="lp-path lp-s17" x1="506.0" y1="88.5" x2="577.4" y2="185.8"/>
+<line class="lp-path lp-s18" x1="577.4" y1="185.8" x2="578.9" y2="89.5"/>
+<line class="lp-path lp-s19" x1="578.9" y1="89.5" x2="590.1" y2="237.7"/>
+<line class="lp-path lp-s20" x1="590.1" y1="237.7" x2="522.5" y2="34.8"/>
+<line class="lp-path lp-s21" x1="522.5" y1="34.8" x2="380.4" y2="28.7"/>
+<line class="lp-path lp-s22" x1="380.4" y1="28.7" x2="299.7" y2="28.1"/>
+<line class="lp-path lp-s23" x1="299.7" y1="28.1" x2="171.8" y2="28.0"/>
+<line class="lp-path lp-s24" x1="171.8" y1="28.0" x2="240.1" y2="28.1"/>
+<line class="lp-path lp-s25" x1="240.1" y1="28.1" x2="256.5" y2="28.1"/>
+<line class="lp-path lp-s26" x1="256.5" y1="28.1" x2="467.8" y2="31.2"/>
+<line class="lp-path lp-s27" x1="467.8" y1="31.2" x2="528.0" y2="45.8"/>
+<g class="lp-pt lp-p0" style="--c:#4aa8ff"><circle class="lp-hit" cx="590.9" cy="360.1" r="13"/><circle cx="590.9" cy="360.1" r="6"/><text x="599.9" y="365.1">1</text></g>
+<g class="lp-pt lp-p1" style="--c:#50a9f9"><circle class="lp-hit" cx="488.7" cy="283.6" r="13"/><circle cx="488.7" cy="283.6" r="6"/><text x="497.7" y="288.6">2</text></g>
+<g class="lp-pt lp-p2" style="--c:#57aaf2"><circle class="lp-hit" cx="479.8" cy="309.3" r="13"/><circle cx="479.8" cy="309.3" r="6"/><text x="488.8" y="314.3">3</text></g>
+<g class="lp-pt lp-p3" style="--c:#5dabec"><circle class="lp-hit" cx="453.4" cy="273.0" r="13"/><circle cx="453.4" cy="273.0" r="6"/><text x="462.4" y="278.0" class="is-off">4</text></g>
+<g class="lp-pt lp-p4" style="--c:#63ace5"><circle class="lp-hit" cx="454.0" cy="275.8" r="13"/><circle cx="454.0" cy="275.8" r="6"/><text x="463.0" y="280.8">5</text></g>
+<g class="lp-pt lp-p5" style="--c:#6aaddf"><circle class="lp-hit" cx="520.6" cy="272.2" r="13"/><circle cx="520.6" cy="272.2" r="6"/><text x="529.6" y="277.2">6</text></g>
+<g class="lp-pt lp-p6" style="--c:#70aed8"><circle class="lp-hit" cx="484.2" cy="168.7" r="13"/><circle cx="484.2" cy="168.7" r="6"/><text x="493.2" y="173.7">7</text></g>
+<g class="lp-pt lp-p7" style="--c:#76afd2"><circle class="lp-hit" cx="523.6" cy="178.1" r="13"/><circle cx="523.6" cy="178.1" r="6"/><text x="532.6" y="183.1">8</text></g>
+<g class="lp-pt lp-p8" style="--c:#7db0cb"><circle class="lp-hit" cx="446.7" cy="165.8" r="13"/><circle cx="446.7" cy="165.8" r="6"/><text x="455.7" y="170.8">9</text></g>
+<g class="lp-pt lp-p9" style="--c:#83b1c5"><circle class="lp-hit" cx="474.7" cy="140.4" r="13"/><circle cx="474.7" cy="140.4" r="6"/><text x="483.7" y="145.4">10</text></g>
+<g class="lp-pt lp-p10" style="--c:#89b2bf"><circle class="lp-hit" cx="560.1" cy="150.0" r="13"/><circle cx="560.1" cy="150.0" r="6"/><text x="569.1" y="155.0">11</text></g>
+<g class="lp-pt lp-p11" style="--c:#90b3b8"><circle class="lp-hit" cx="498.1" cy="113.7" r="13"/><circle cx="498.1" cy="113.7" r="6"/><text x="507.1" y="118.7" class="is-off">12</text></g>
+<g class="lp-pt lp-p12" style="--c:#96b4b2"><circle class="lp-hit" cx="474.0" cy="124.5" r="13"/><circle cx="474.0" cy="124.5" r="6"/><text x="483.0" y="129.5" class="is-off">13</text></g>
+<g class="lp-pt lp-p13" style="--c:#9cb5ab"><circle class="lp-hit" cx="511.9" cy="113.2" r="13"/><circle cx="511.9" cy="113.2" r="6"/><text x="520.9" y="118.2">14</text></g>
+<g class="lp-pt lp-p14" style="--c:#a3b7a5"><circle class="lp-hit" cx="486.0" cy="119.8" r="13"/><circle cx="486.0" cy="119.8" r="6"/><text x="495.0" y="124.8" class="is-off">15</text></g>
+<g class="lp-pt lp-p15" style="--c:#a9b89e"><circle class="lp-hit" cx="477.4" cy="116.6" r="13"/><circle cx="477.4" cy="116.6" r="6"/><text x="486.4" y="121.6">16</text></g>
+<g class="lp-pt lp-p16" style="--c:#afb998"><circle class="lp-hit" cx="506.0" cy="88.5" r="13"/><circle cx="506.0" cy="88.5" r="6"/><text x="515.0" y="93.5">17</text></g>
+<g class="lp-pt lp-p17" style="--c:#b6ba91"><circle class="lp-hit" cx="577.4" cy="185.8" r="13"/><circle cx="577.4" cy="185.8" r="6"/><text x="586.4" y="190.8">18</text></g>
+<g class="lp-pt lp-p18" style="--c:#bcbb8b"><circle class="lp-hit" cx="578.9" cy="89.5" r="13"/><circle cx="578.9" cy="89.5" r="6"/><text x="587.9" y="94.5">19</text></g>
+<g class="lp-pt lp-p19" style="--c:#c2bc85"><circle class="lp-hit" cx="590.1" cy="237.7" r="13"/><circle cx="590.1" cy="237.7" r="6"/><text x="599.1" y="242.7">20</text></g>
+<g class="lp-pt lp-p20" style="--c:#c9bd7e"><circle class="lp-hit" cx="522.5" cy="34.8" r="13"/><circle cx="522.5" cy="34.8" r="6"/><text x="531.5" y="39.8" class="is-off">21</text></g>
+<g class="lp-pt lp-p21" style="--c:#cfbe78"><circle class="lp-hit" cx="380.4" cy="28.7" r="13"/><circle cx="380.4" cy="28.7" r="6"/><text x="389.4" y="33.7">22</text></g>
+<g class="lp-pt lp-p22" style="--c:#d5bf71"><circle class="lp-hit" cx="299.7" cy="28.1" r="13"/><circle cx="299.7" cy="28.1" r="6"/><text x="308.7" y="33.1">23</text></g>
+<g class="lp-pt lp-p23" style="--c:#dcc06b"><circle class="lp-hit" cx="171.8" cy="28.0" r="13"/><circle cx="171.8" cy="28.0" r="6"/><text x="180.8" y="33.0">24</text></g>
+<g class="lp-pt lp-p24" style="--c:#e2c164"><circle class="lp-hit" cx="240.1" cy="28.1" r="13"/><circle cx="240.1" cy="28.1" r="6"/><text x="249.1" y="33.1" class="is-off">25</text></g>
+<g class="lp-pt lp-p25" style="--c:#e8c25e"><circle class="lp-hit" cx="256.5" cy="28.1" r="13"/><circle cx="256.5" cy="28.1" r="6"/><text x="265.5" y="33.1">26</text></g>
+<g class="lp-pt lp-p26" style="--c:#efc357"><circle class="lp-hit" cx="467.8" cy="31.2" r="13"/><circle cx="467.8" cy="31.2" r="6"/><text x="476.8" y="36.2">27</text></g>
+<g class="lp-pt lp-p27 is-cur" style="--c:#f5c451"><circle class="lp-hit" cx="528.0" cy="45.8" r="13"/><circle cx="528.0" cy="45.8" r="6"/><text x="537.0" y="50.8">28</text></g>
+<rect class="lp-x" x="730" y="430" width="340" height="12" rx="2"/>
+<text class="lp-lbl" x="722" y="441" text-anchor="end">x</text>
+<text class="lp-lbl" x="1078" y="441">« of »</text>
+<line class="lp-stream" id="lp-stream" x1="1040" x2="1040" y1="430" y2="158.0"/>
+<g class="lp-seg lp-g0"><rect x="730" y="375.0" width="340" height="49.0" rx="3"/><text class="lp-rng" x="740" y="391.0">1–9</text><text class="lp-name lp-noise" x="796" y="391.0">noise: ertas, ␣scarce, _rgba…</text><circle cx="1058" cy="381.3" r="1.6"/><circle cx="1058" cy="385.8" r="1.6"/><circle cx="1058" cy="390.4" r="1.6"/><circle cx="1058" cy="394.9" r="1.6"/><circle cx="1058" cy="399.5" r="1.6"/><circle cx="1058" cy="404.1" r="1.6"/><circle cx="1058" cy="408.6" r="1.6"/><circle cx="1058" cy="413.2" r="1.6"/><circle cx="1058" cy="417.7" r="1.6"/></g>
+<g class="lp-seg lp-g1"><rect x="730" y="350.0" width="340" height="21.0" rx="3"/><text class="lp-rng" x="740" y="366.0">10</text><text class="lp-name" x="796" y="366.0">postalcode</text><circle cx="1058" cy="360.5" r="1.6"/></g>
+<g class="lp-seg lp-g2"><rect x="730" y="325.0" width="340" height="21.0" rx="3"/><text class="lp-rng" x="740" y="341.0">11</text><text class="lp-name" x="796" y="341.0">␣cities</text><circle cx="1058" cy="335.5" r="1.6"/></g>
+<g class="lp-seg lp-g3"><rect x="730" y="289.5" width="340" height="31.5" rx="3"/><text class="lp-rng" x="740" y="305.5">12–15</text><text class="lp-name" x="796" y="305.5">␣country</text><circle cx="1058" cy="297.8" r="1.6"/><circle cx="1058" cy="302.8" r="1.6"/><circle cx="1058" cy="307.8" r="1.6"/><circle cx="1058" cy="312.8" r="1.6"/></g>
+<g class="lp-seg lp-g4"><rect x="730" y="264.5" width="340" height="21.0" rx="3"/><text class="lp-rng" x="740" y="280.5">16</text><text class="lp-name" x="796" y="280.5">␣many</text><circle cx="1058" cy="275.0" r="1.6"/></g>
+<g class="lp-seg lp-g5"><rect x="730" y="239.5" width="340" height="21.0" rx="3"/><text class="lp-rng" x="740" y="255.5">17</text><text class="lp-name" x="796" y="255.5">␣agriculture</text><circle cx="1058" cy="250.0" r="1.6"/></g>
+<g class="lp-seg lp-g6"><rect x="730" y="207.5" width="340" height="28.0" rx="3"/><text class="lp-rng" x="740" y="223.5">18–20</text><text class="lp-name" x="796" y="223.5">␣____</text><circle cx="1058" cy="216.5" r="1.6"/><circle cx="1058" cy="221.5" r="1.6"/><circle cx="1058" cy="226.5" r="1.6"/></g>
+<g class="lp-seg lp-g7 is-cur"><rect x="730" y="158.0" width="340" height="45.5" rx="3"/><text class="lp-rng" x="740" y="174.0">21–28</text><text class="lp-name lp-fr" x="796" y="174.0">␣France</text><circle cx="1058" cy="164.3" r="1.6"/><circle cx="1058" cy="169.0" r="1.6"/><circle cx="1058" cy="173.7" r="1.6"/><circle cx="1058" cy="178.4" r="1.6"/><circle cx="1058" cy="183.1" r="1.6"/><circle cx="1058" cy="187.8" r="1.6"/><circle cx="1058" cy="192.5" r="1.6"/><circle cx="1058" cy="197.2" r="1.6"/></g>
+<g class="lp-head" transform="translate(0 106.0)"><rect class="lp-wu" x="730" y="0" width="340" height="40"/><text class="lp-ink" x="722" y="26" text-anchor="end">W<tspan baseline-shift="sub" font-size="12">U</tspan></text><text class="lp-lbl" x="1078" y="16">final</text><text class="lp-lbl" x="1078" y="33">norm</text><g class="lp-ov lp-o0"><rect class="lp-col lp-ot" x="845.9" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H847.9 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">ertas</text><text class="lp-num" x="10" y="56">p = 88.3 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 47 391</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 5.0·10<tspan baseline-shift="super" font-size="11">-9</tspan></text></g></g><g class="lp-ov lp-o1"><rect class="lp-col lp-ot" x="858.7" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H860.7 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣scarce</text><text class="lp-num" x="10" y="56">p = 13.7 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 15 960</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 4.1·10<tspan baseline-shift="super" font-size="11">-7</tspan></text></g></g><g class="lp-ov lp-o2"><rect class="lp-col lp-ot" x="940.6" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H942.6 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">_rgba</text><text class="lp-num" x="10" y="56">p = 11.7 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 31 193</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 9.3·10<tspan baseline-shift="super" font-size="11">-8</tspan></text></g></g><g class="lp-ov lp-o3"><rect class="lp-col lp-ot" x="1035.5" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H1037.5 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">индив</text><text class="lp-num" x="10" y="56">p = 7.2 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 15 978</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 7.5·10<tspan baseline-shift="super" font-size="11">-7</tspan></text></g></g><g class="lp-ov lp-o4"><rect class="lp-col lp-ot" x="1037.1" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H1039.1 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">реги</text><text class="lp-num" x="10" y="56">p = 7.3 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 14 379</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 6.4·10<tspan baseline-shift="super" font-size="11">-7</tspan></text></g></g><g class="lp-ov lp-o5"><rect class="lp-col lp-ot" x="930.9" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H932.9 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">dateFormat</text><text class="lp-num" x="10" y="56">p = 24.6 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 14 458</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 7.8·10<tspan baseline-shift="super" font-size="11">-7</tspan></text></g></g><g class="lp-ov lp-o6"><rect class="lp-col lp-ot" x="883.1" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H885.1 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">_dyn</text><text class="lp-num" x="10" y="56">p = 12.6 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 310</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 0.03 %</text></g></g><g class="lp-ov lp-o7"><rect class="lp-col lp-ot" x="883.1" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H885.1 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">_dyn</text><text class="lp-num" x="10" y="56">p = 25.9 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 446</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 0.02 %</text></g></g><g class="lp-ov lp-o8"><rect class="lp-col lp-ot" x="883.1" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H885.1 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">_dyn</text><text class="lp-num" x="10" y="56">p = 6.4 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 274</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 0.04 %</text></g></g><g class="lp-ov lp-o9"><rect class="lp-col lp-ot" x="899.1" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H901.1 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">postalcode</text><text class="lp-num" x="10" y="56">p = 10.6 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 84</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 0.15 %</text></g></g><g class="lp-ov lp-o10"><rect class="lp-col lp-ot" x="751.5" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H753.5 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣cities</text><text class="lp-num" x="10" y="56">p = 50.4 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 49</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 0.09 %</text></g></g><g class="lp-ov lp-o11"><rect class="lp-col lp-ot" x="737.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H739.0 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣country</text><text class="lp-num" x="10" y="56">p = 16.3 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 18</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 0.72 %</text></g></g><g class="lp-ov lp-o12"><rect class="lp-col lp-ot" x="737.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H739.0 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣country</text><text class="lp-num" x="10" y="56">p = 10.5 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 35</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 0.39 %</text></g></g><g class="lp-ov lp-o13"><rect class="lp-col lp-ot" x="737.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H739.0 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣country</text><text class="lp-num" x="10" y="56">p = 20.9 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 15</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 0.74 %</text></g></g><g class="lp-ov lp-o14"><rect class="lp-col lp-ot" x="737.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H739.0 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣country</text><text class="lp-num" x="10" y="56">p = 13.1 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 27</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 0.51 %</text></g></g><g class="lp-ov lp-o15"><rect class="lp-col lp-ot" x="733.7" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H735.7 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣many</text><text class="lp-num" x="10" y="56">p = 11.2 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 25</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 0.61 %</text></g></g><g class="lp-ov lp-o16"><rect class="lp-col lp-ot" x="794.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H796.0 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣agriculture</text><text class="lp-num" x="10" y="56">p = 18.8 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 6</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 3.1 %</text></g></g><g class="lp-ov lp-o17"><rect class="lp-col lp-ot" x="798.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H800.0 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣____</text><text class="lp-num" x="10" y="56">p = 69.0 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 16</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 0.01 %</text></g></g><g class="lp-ov lp-o18"><rect class="lp-col lp-ot" x="798.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H800.0 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣____</text><text class="lp-num" x="10" y="56">p = 71.0 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 5</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 2.9 %</text></g></g><g class="lp-ov lp-o19"><rect class="lp-col lp-ot" x="798.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M812.5,-22 V-15 H800.0 V-2"/><g class="lp-card lp-ot lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣____</text><text class="lp-num" x="10" y="56">p = 87.0 %</text></g><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M987.5,-22 V-8 H753.3 V-2"/><g class="lp-card lp-fr" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RANK 15</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 5.7·10<tspan baseline-shift="super" font-size="11">-6</tspan></text></g></g><g class="lp-ov lp-o20"><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M812.5,-22 V-15 H753.3 V-2"/><g class="lp-card lp-fr lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 67.6 %</text></g><rect class="lp-col lp-ot" x="798.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M987.5,-22 V-8 H800.0 V-2"/><g class="lp-card lp-ot" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RUNNER-UP</text><text class="lp-tok" x="10" y="38">␣____</text><text class="lp-num" x="10" y="56">p = 25.4 %</text></g></g><g class="lp-ov lp-o21"><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M812.5,-22 V-15 H753.3 V-2"/><g class="lp-card lp-fr lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 96.2 %</text></g><rect class="lp-col lp-ot" x="798.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M987.5,-22 V-8 H800.0 V-2"/><g class="lp-card lp-ot" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RUNNER-UP</text><text class="lp-tok" x="10" y="38">␣____</text><text class="lp-num" x="10" y="56">p = 1.9 %</text></g></g><g class="lp-ov lp-o22"><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M812.5,-22 V-15 H753.3 V-2"/><g class="lp-card lp-fr lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 99.5 %</text></g><rect class="lp-col lp-ot" x="732.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M987.5,-22 V-8 H734.0 V-2"/><g class="lp-card lp-ot" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RUNNER-UP</text><text class="lp-tok" x="10" y="38">␣which</text><text class="lp-num" x="10" y="56">p = 0.44 %</text></g></g><g class="lp-ov lp-o23"><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M812.5,-22 V-15 H753.3 V-2"/><g class="lp-card lp-fr lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 99.9 %</text></g><rect class="lp-col lp-ot" x="732.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M987.5,-22 V-8 H734.0 V-2"/><g class="lp-card lp-ot" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RUNNER-UP</text><text class="lp-tok" x="10" y="38">␣which</text><text class="lp-num" x="10" y="56">p = 0.04 %</text></g></g><g class="lp-ov lp-o24"><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M812.5,-22 V-15 H753.3 V-2"/><g class="lp-card lp-fr lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 99.7 %</text></g><rect class="lp-col lp-ot" x="960.7" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M987.5,-22 V-8 H962.7 V-2"/><g class="lp-card lp-ot" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RUNNER-UP</text><text class="lp-tok" x="10" y="38">法国</text><text class="lp-num" x="10" y="56">p = 0.15 %</text></g></g><g class="lp-ov lp-o25"><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M812.5,-22 V-15 H753.3 V-2"/><g class="lp-card lp-fr lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 99.6 %</text></g><rect class="lp-col lp-ot" x="732.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M987.5,-22 V-8 H734.0 V-2"/><g class="lp-card lp-ot" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RUNNER-UP</text><text class="lp-tok" x="10" y="38">␣which</text><text class="lp-num" x="10" y="56">p = 0.20 %</text></g></g><g class="lp-ov lp-o26"><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M812.5,-22 V-15 H753.3 V-2"/><g class="lp-card lp-fr lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 83.3 %</text></g><rect class="lp-col lp-ot" x="732.0" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M987.5,-22 V-8 H734.0 V-2"/><g class="lp-card lp-ot" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RUNNER-UP</text><text class="lp-tok" x="10" y="38">␣which</text><text class="lp-num" x="10" y="56">p = 9.4 %</text></g></g><g class="lp-ov lp-o27 is-cur"><rect class="lp-col lp-fr" x="751.3" y="-3" width="4" height="46"/><path class="lp-lead lp-fr" d="M812.5,-22 V-15 H753.3 V-2"/><g class="lp-card lp-fr lp-lead1" transform="translate(730 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">TOP-1</text><text class="lp-tok" x="10" y="38">␣France</text><text class="lp-num" x="10" y="56">p = 35.9 %</text></g><rect class="lp-col lp-ot" x="730.6" y="-3" width="4" height="46"/><path class="lp-lead lp-ot" d="M987.5,-22 V-8 H732.6 V-2"/><g class="lp-card lp-ot" transform="translate(905 -86)"><rect width="165" height="64" rx="6"/><text class="lp-badge" x="10" y="16">RUNNER-UP</text><text class="lp-tok" x="10" y="38">␣the</text><text class="lp-num" x="10" y="56">p = 28.1 %</text></g></g></g>
+<script><![CDATA[
+(() => {
+  const LAST = [8, 9, 10, 14, 15, 16, 19, 27], WU = [374, 323.0, 298.0, 273.0, 237.5, 212.5, 187.5, 155.5, 106.0], TOPS = [426, 375.0, 350.0, 325.0, 289.5, 264.5, 239.5, 207.5, 158.0], LABELS = [[], [0, 1, 2, 4, 5, 6, 7, 8], [0, 1, 2, 4, 5, 6, 7, 8, 9], [0, 1, 2, 4, 5, 6, 7, 8, 9, 10], [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 14], [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 13, 15], [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 13, 15, 16], [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 13, 15, 16, 17, 18, 19], [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 13, 15, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27]], N = 28;
+  const $ = (s) => document.querySelector(s);
+  const head = $('.lp-head');
+  function cards(k) {
+    for (let j = 0; j < N; j++) $(`.lp-o${j}`).classList.toggle('is-cur', j === k);
+    for (let j = 0; j < N; j++) $(`.lp-p${j}`).classList.toggle('is-cur', j === k);
+  }
+  function show(s) {
+    const last = s ? LAST[s - 1] : -1;
+    for (let j = 0; j < N; j++) {
+      $(`.lp-p${j}`).classList.toggle('is-off', j > last);
+      if (j) $(`.lp-s${j}`).classList.toggle('is-off', j > last);
+    }
+    LAST.forEach((_, g) => {
+      $(`.lp-g${g}`).classList.toggle('is-off', g >= s);
+      $(`.lp-g${g}`).classList.toggle('is-cur', g === s - 1);
+    });
+    for (let j = 0; j < N; j++) $(`.lp-p${j} text`).classList.toggle('is-off', !LABELS[s].includes(j));
+    $('#lp-stream').setAttribute('y2', TOPS[s]);
+    head.setAttribute('transform', `translate(0 ${WU[s]})`);
+    cards(last);
+  }
+  for (let j = 0; j < N; j++) $(`.lp-p${j}`).addEventListener('mouseenter', () => cards(j));
+  window.addEventListener('message', (ev) => {
+    if (ev.data && typeof ev.data.lens === 'number') show(Math.max(0, Math.min(LAST.length, ev.data.lens)));
+  });
+  if (window.parent !== window) window.parent.postMessage({ lensReady: true }, '*');
+})();
+]]></script>
+</svg>

@@ -1,0 +1,25 @@
+/* Prefill and decode slides (themes/prefill.js): the figure is an SVG in slide coordinates
+   over the whole slide; the captions sit where « Matrix version » puts its own. */
+.pd { position: absolute; inset: 0; pointer-events: none; }
+/* fill on the svg, not on its text: the figure sets the colour of some texts with fill="…" */
+.pd > svg { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; fill: var(--cutebugs-ink); }
+.pd svg text { font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; letter-spacing: normal; }
+.pd svg .mono { font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; }
+/* matrix names over their cells, dimension labels of the braces */
+.pd svg .nm { font-size: 22px; font-weight: 600; text-anchor: middle; dominant-baseline: central;
+  paint-order: stroke; stroke: #0f1829; stroke-width: 5px; stroke-linejoin: round; }
+.pd svg .bl { font-size: 20px; font-style: italic; fill: var(--cutebugs-cyan); }
+.pd-caps { position: absolute; left: 72px; top: 606px; width: 1136px; display: grid; font-size: 25px; }
+.pd-caps > p { grid-area: 1 / 1; margin: 0 !important; }
+.pd-caps > p.is-off { visibility: hidden; }
+
+/* a copy flies (and turns) to where its value lands, then fades; the landing fades in */
+.pd .fly { transform-box: view-box; animation: pd-fly 1s cubic-bezier(.5, 0, .3, 1) both; }
+.pd .land { animation: pd-land .25s .95s both; }
+@keyframes pd-fly {
+  0% { transform: none; }
+  92% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; }
+}
+@keyframes pd-land { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pd .fly { display: none; } .pd .land { animation: none; } }

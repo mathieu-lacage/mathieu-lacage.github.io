@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Lectures</title>
+<link rel="stylesheet" href="vendor/reveal/reveal.css">
+<link rel="stylesheet" href="themes/cutebugs.css">
+<style>
+/* landing: the overview only; a click (or Enter) opens the deck */
+#keys { display: none !important; }
+.reveal.overview .slides > section { cursor: pointer; }
+</style>
+</head>
+<body>
+<!-- copied into every slide by themes/deck.js -->
+<footer id="footer" hidden>LLM Lectures — 2026-10-08 — <a href="mailto:mathieu.lacage@inria.fr">mathieu.lacage@inria.fr</a></footer>
+<div class="reveal">
+<div class="slides">
+
+<section class="title" data-href="next-word-prediction.html">
+<h1>Next word probability and similarity</h1>
+</section>
+
+<section class="title" data-href="inference.html">
+<h1>LLM Inference</h1>
+</section>
+
+</div>
+</div>
+
+<script src="vendor/reveal/reveal.js"></script>
+<script src="vendor/reveal/notes.js"></script>
+<script src="themes/deck.js"></script>
+<script>
+// Stay in the overview: a click or Enter opens the slide's deck, Esc and O do nothing.
+(() => {
+  const open = (s) => { location.href = s.dataset.href; };
+  Reveal.on('ready', () => Reveal.toggleOverview(true));
+  Reveal.on('overviewhidden', () => Reveal.toggleOverview(true));
+  document.addEventListener('click', (e) => {
+    const s = e.target.closest('.reveal .slides > section');
+    if (!s) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    open(s);
+  }, true);
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') open(Reveal.getCurrentSlide());
+    else if (!['Escape', 'o', 'O'].includes(e.key)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
+})();
+</script>
+</body>
+</html>

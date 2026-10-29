@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "description": "PDF export of the deck (make pdf), live-reload server (make serve)",
+  "devDependencies": {
+    "browser-sync": "^3.0.0",
+    "puppeteer-core": "^24.0.0"
+  }
+}

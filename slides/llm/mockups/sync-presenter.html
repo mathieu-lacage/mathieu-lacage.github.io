@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sync mockup — presenter</title>
+<link rel="stylesheet" href="../vendor/reveal/reveal.css">
+<link rel="stylesheet" href="../themes/cutebugs.css">
+<script src="../themes/steps.js"></script>
+<style>
+  /* stand-in for the slide-9 figure: a step counter + the caption of the current step */
+  .mock .big { font: 600 72px/1 'IBM Plex Mono', ui-monospace, monospace; color: var(--cutebugs-blue); margin: 24px 0 28px; }
+  .mock .big small { font-size: 30px; color: var(--cutebugs-slate); }
+  .mock-caps > p { margin: 0 !important; font-size: 23px; line-height: 1.35; background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-blue); padding: 12px 22px; transition: opacity .3s; }
+  .mock-caps > p.is-off { opacity: 0; }
+</style>
+</head>
+<body>
+<!-- copied into every slide by themes/deck.js -->
+<footer id="footer" hidden>Sync mockup — 2026 — mathieu.lacage@inria.fr</footer>
+<div class="reveal">
+<div class="slides">
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>Sync mockup — presenter</h1>
+<p>Press <strong>L</strong> (or the « followers » button): pick the channel, scan the QR on a phone.</p>
+<p>Slide 2 stands in for slide 9 (« Matrix version ») of llm-inference.html: 13 steps on <code>steps.js</code>. It carries a hidden <code>.followers</code> block — the follower view shows its content instead of mirroring the slide.</p>
+<p>Slide 1 and any third slide have none: the follower view mirrors them live.</p>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Matrix version</h1>
+
+<div class="mock" data-steps="13">
+<div class="big">step <span class="stepno">0</span><small>/13</small></div>
+<div class="mock-caps">
+<p>Input: <strong>x</strong>, n rows of d numbers, one row per token</p>
+<p><strong>Query</strong>: Q = x · W<sub>Q</sub>; we follow its last row, q<sub>4</sub> (« capital »)</p>
+<p><strong>Key</strong>: K = x · W<sub>K</sub>, the same x with another weight matrix</p>
+<p><strong>Transpose</strong>: K<sup>T</sup> has one column per token</p>
+<p>q<sub>4</sub> · k<sub>1</sub>: row 4 of Q times column 1 of K<sup>T</sup></p>
+<p>q<sub>4</sub> · k<sub>2</sub>: same row of Q, next column of K<sup>T</sup></p>
+<p>q<sub>4</sub> · k<sub>3</sub></p>
+<p>q<sub>4</sub> · k<sub>4</sub>: the last token sees every token, itself included</p>
+<p><strong>Softmax</strong> on row 4: the 4 scores become weights that sum to 1</p>
+<p><strong>Value</strong>: V = x · W<sub>V</sub></p>
+<p><strong>Mix</strong>: z<sub>4</sub> = 0.45 v<sub>1</sub> + 0.10 v<sub>2</sub> + 0.10 v<sub>3</sub> + 0.35 v<sub>4</sub>, row 4 of A times V</p>
+<p>Rows 1 to 3: same steps, all at once; row i only sees rows ≤ i</p>
+<p><strong>Output</strong>: O = Z · W<sub>O</sub>, back to n × d</p>
+</div>
+</div>
+
+<!-- Content aimed at the followers: hidden on the projector, extracted by the
+     follower view (follower.html). Lines carry their file line number (data-n) and
+     the slide steps they belong to (data-s); this is what tools/code_slide.py will
+     emit from the `# » s…` sentinel comments of the real attention.py. -->
+<div class="followers" hidden>
+<pre class="code" data-label="attention.py — the slide, with matrices"><code><span class="ln" data-n="1">import numpy as np</span>
+<span class="ln" data-n="2"></span>
+<span class="ln" data-n="3">def softmax(s):</span>
+<span class="ln" data-n="4">    e = np.exp(s - s.max(axis=-1, keepdims=True))</span>
+<span class="ln" data-n="5">    return e / e.sum(axis=-1, keepdims=True)</span>
+<span class="ln" data-n="6"></span>
+<span class="ln" data-n="7">def attention(x, Wq, Wk, Wv, Wo):</span>
+<span class="ln" data-n="8">    """One head: x is n x d; Wq, Wk, Wv are d x dh; Wo is dh x d."""</span>
+<span class="ln" data-n="9" data-s="1">    n, d = x.shape</span>
+<span class="ln" data-n="10" data-s="2">    Q = x @ Wq</span>
+<span class="ln" data-n="11" data-s="3">    K = x @ Wk</span>
+<span class="ln" data-n="12" data-s="4 5 6 7 8">    S = Q @ K.T / np.sqrt(Wq.shape[1])</span>
+<span class="ln" data-n="13" data-s="12">    S += np.triu(np.full((n, n), -np.inf), 1)</span>
+<span class="ln" data-n="14" data-s="9">    A = softmax(S)</span>
+<span class="ln" data-n="15" data-s="10">    V = x @ Wv</span>
+<span class="ln" data-n="16" data-s="11">    Z = A @ V</span>
+<span class="ln" data-n="17" data-s="13">    return Z @ Wo</span></code></pre>
+<pre class="code" data-label="attention.py — the same, written out"><code><span class="ln" data-n="19">def attention_manual(x, Wq, Wk, Wv, Wo):</span>
+<span class="ln" data-n="20">    """The same result, the matrix products written out."""</span>
+<span class="ln" data-n="21" data-s="1">    n, d = x.shape</span>
+<span class="ln" data-n="22">    dh = Wq.shape[1]</span>
+<span class="ln" data-n="23">    out = np.zeros((n, Wo.shape[1]))</span>
+<span class="ln" data-n="24" data-s="12">    for i in range(n):</span>
+<span class="ln" data-n="25" data-s="2">        q = x[i] @ Wq</span>
+<span class="ln" data-n="26">        s = np.empty(i + 1)</span>
+<span class="ln" data-n="27" data-s="4 12">        for j in range(i + 1):</span>
+<span class="ln" data-n="28" data-s="3 5 6 7 8">            s[j] = q @ (x[j] @ Wk) / np.sqrt(dh)</span>
+<span class="ln" data-n="29" data-s="9">        a = softmax(s)</span>
+<span class="ln" data-n="30" data-s="10">        v = x @ Wv</span>
+<span class="ln" data-n="31" data-s="11">        z = a @ v[:i + 1]</span>
+<span class="ln" data-n="32" data-s="13">        out[i] = z @ Wo + x[i]</span>
+<span class="ln" data-n="33" data-s="13">    return out</span></code></pre>
+<div class="caps" hidden>
+<p>Input: x, n rows of d numbers, one row per token</p>
+<p>Query: Q = x · W_Q — we follow its last row q₄, « capital »</p>
+<p>Key: K = x · W_K, the same x with another weight matrix</p>
+<p>Transpose: Kᵀ has one column per token</p>
+<p>q₄ · k₁: row 4 of Q times column 1 of Kᵀ</p>
+<p>q₄ · k₂: same row of Q, next column of Kᵀ</p>
+<p>q₄ · k₃</p>
+<p>q₄ · k₄: the last token sees every token, itself included</p>
+<p>Softmax on row 4: the 4 scores become weights that sum to 1</p>
+<p>Value: V = x · W_V</p>
+<p>Mix: z₄ = row 4 of A times V</p>
+<p>Rows 1 to 3: same steps, all at once; row i only sees rows ≤ i</p>
+<p>Output: O = Z · W_O, back to n × d</p>
+</div>
+<div class="trace" hidden>
+<p>x: 4 × 2 — Paris, is, the, capital</p>
+<p>Q: 4 × 2 · q₄ = row 4</p>
+<p>K: 4 × 2 · k_j = row j</p>
+<p>Kᵀ: 2 × 4 · column j = k_j</p>
+<p>q₄ · k₁ = 2.10</p>
+<p>q₄ · k₂ = 0.60</p>
+<p>q₄ · k₃ = 0.60</p>
+<p>q₄ · k₄ = 1.85</p>
+<p>softmax(2.10, 0.60, 0.60, 1.85) = (0.45, 0.10, 0.10, 0.35)</p>
+<p>V: 4 × 2</p>
+<p>z₄ = 0.45 v₁ + 0.10 v₂ + 0.10 v₃ + 0.35 v₄</p>
+<p>the mask: −∞ above the diagonal — in the loops, j ≤ i</p>
+<p>O: 4 × 2 → « France »</p>
+</div>
+</div>
+<script>
+(() => {
+  const root = document.querySelector('.mock');
+  const caps = [...root.querySelectorAll('.mock-caps > p')];
+  const no = root.querySelector('.stepno');
+  steps(root, 13, (st) => {
+    const k = st === null ? 13 : st;                   // ?print-pdf: the final state
+    caps.forEach((c, i) => c.classList.toggle('is-off', st !== null && i >= st));
+    no.textContent = k;
+  });
+})();
+</script>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>A slide without followers content</h1>
+<p>The follower view mirrors this slide live: the deck itself is the source, no extra page to maintain.</p>
+</section>
+
+</div>
+</div>
+<script src="../vendor/reveal/reveal.js"></script>
+<script src="../vendor/reveal/notes.js"></script>
+<script src="../themes/deck.js"></script>
+<script src="../themes/sync.js" data-topic-base="inria-llm-mock" data-deck="sync-mock" data-follower="../follower.html"></script>
+<script src="../themes/sync-qr.js"></script>
+</body>
+</html>
