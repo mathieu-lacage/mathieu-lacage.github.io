@@ -15,7 +15,7 @@ markup:
 
 params:
   ThemeColor: blue
-  showMenuItems: 5
+  showMenuItems: 6
   fullWidthTheme: false
   centerTheme: true
 
@@ -40,6 +40,9 @@ menu:
     - identifier: ns-3-usage
       name: ns-3 Usage
       url: /ns-3-usage
+    - identifier: slides
+      name: Slides
+      url: /slides
 #    - identifier = "make"
 #      name = "Make"
 #      url = "/make"
