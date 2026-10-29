@@ -2,18 +2,19 @@
 // page (follower.html) can follow along on the audience's laptops.
 //
 //   <script src="themes/deck.js"></script>
-//   <script src="themes/sync.js" data-topic-base="inria-llm" data-deck="llm-inference"
+//   <script src="themes/sync.js" data-topic-base="inria-llm"
 //           data-follower="follower.html"></script>
 //
-// The channel is picked in the deck with the « followers » button (sync-qr.js, key L):
+// The channel is picked in the deck with the « follow along » button (sync-qr.js, key L):
 // topic = data-topic-base + '-' + a random string per talk. It is kept in
 // localStorage, so a follower page served from the same origin as the deck finds it
 // without a URL; elsewhere pass it as ?ch=<topic>. The topic is the password
 // (docs.ntfy.sh): whoever has it can publish — the random suffix is the whole
 // access control, which is fine for a lecture.
 //
-// Sends the full state {ver, deck, h, s, f, t} — never deltas — so clients are
-// idempotent and a lost message is corrected by the next step. Trailing-throttled
+// Sends the full state {ver, url, h, s, f, t} — never deltas — so clients are
+// idempotent and a lost message is corrected by the next step. url is the deck's
+// own address: the follower needs nothing else to mirror it. Trailing-throttled
 // to one message per 700 ms: ntfy.sh rate-limits anonymous publishing, and the
 // newest state is the only one that matters. ?print-pdf does not publish, and
 // neither does an embedded deck (the follower view mirrors the deck in an iframe).
@@ -21,7 +22,7 @@
   const me = document.currentScript;
   if (!me || window.parent !== window || /print-pdf/i.test(location.search)) return;
   const base = me.dataset.topicBase || 'slides';
-  const follower = me.dataset.follower || new URL('follower.html', location).href;
+  const follower = new URL(me.dataset.follower || 'follower.html', location).href;
   let suffix = me.dataset.topic || '';                  // data-topic: a fixed topic, no dialog
   let last = null, timer = null;
 
@@ -43,7 +44,7 @@
 
   function publish() {
     const i = Reveal.getIndices();
-    last = { ver: 1, deck: me.dataset.deck || location.pathname.replace(/.*\//, '').replace(/\.html$/, ''), h: i.h, s: i.v || 0, f: i.f === undefined ? -1 : i.f };
+    last = { ver: 2, url: location.href.split('#')[0], h: i.h, s: i.v || 0, f: i.f === undefined ? -1 : i.f };
     if (timer === null) timer = setTimeout(send, 700);   // trailing throttle: last state wins
   }
 

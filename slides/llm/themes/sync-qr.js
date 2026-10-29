@@ -6,7 +6,7 @@
   if (!window.syncSetSuffix) return;                     // sync.js not included (e.g. print view)
   const LIB = new URL('../vendor/qrcode.min.js', document.currentScript.src).href;
   const rand = () => Math.random().toString(36).replace(/[^a-z0-9]/g, '').slice(0, 6);
-  let modal = null, input = null, qrel = null, urlel = null;
+  let modal = null, input = null, qrel = null;
 
   document.head.insertAdjacentHTML('beforeend', `<style>
     [hidden] { display: none !important; }
@@ -15,7 +15,6 @@
                    font: 15px/1.5 'IBM Plex Sans', sans-serif; color: var(--cutebugs-ink, #e3e9f3); }
     #syncqr h2 { margin: 0 0 10px; font: 600 22px 'IBM Plex Sans Condensed', sans-serif; color: var(--cutebugs-blue, #4aa8ff); }
     #syncqr p { margin: 8px 0; }
-    #syncqr .u { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--cutebugs-cyan, #8fc5fa); word-break: break-all; }
     #syncqr .qr { background: #fff; border-radius: 8px; padding: 10px; width: min(220px, 60vw); margin: 10px auto; }
     #syncqr .qr svg { display: block; width: 100%; height: auto; }
     #syncqr .row { display: flex; align-items: center; gap: 8px; }
@@ -26,7 +25,6 @@
   </style>`);
 
   function showQR(suffix) {
-    urlel.textContent = window.syncFollowerUrl(suffix);
     qrel.innerHTML = '<small>loading…</small>';
     loadLib().then(() => {
       const qr = qrcode(0, 'M');                         // typeNumber 0: size from the payload
@@ -49,16 +47,14 @@
       modal.id = 'syncqr';
       modal.innerHTML = `
         <div class="box">
-          <h2>Followers follow along</h2>
-          <p>Followers open <span class="u"></span> — or scan:</p>
+          <h2>Follow along</h2>
           <div class="qr"></div>
           <p class="row">channel <input spellcheck="false"> <button class="dice" title="new random string">↻</button></p>
-          <p class="small">Share one URL per talk. Esc closes; the deck publishes to this channel until you change it.</p>
+          <p class="small">Esc closes; the deck publishes to this channel until you change it.</p>
         </div>`;
       document.body.append(modal);
       input = modal.querySelector('input');
       qrel = modal.querySelector('.qr');
-      urlel = modal.querySelector('.u');
       modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
       modal.querySelector('.dice').addEventListener('click', () => { input.value = rand(); update(); });
       input.addEventListener('input', update);
@@ -80,7 +76,7 @@
   if (bar) {
     const b = document.createElement('button');
     b.innerHTML = '<kbd>L</kbd> followers';
-    b.title = 'followers follow along (L)';
+    b.title = 'Follow along (L)';
     b.tabIndex = -1;
     b.addEventListener('mousedown', (e) => e.preventDefault());
     b.addEventListener('click', open);

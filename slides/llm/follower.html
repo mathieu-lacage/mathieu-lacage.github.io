@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LLM Inference — followers</title>
+<title>Followers</title>
 <link rel="stylesheet" href="themes/cutebugs.css">
 <style>
   /* The follower view is a plain page, not a slide: it only borrows the theme's
-     palette and fonts. It mirrors the presenter's slide (an iframe of the deck,
-     navigated by #/h/v/f) and, when the current slide carries a hidden .followers
-     block, shows that instead — the code aimed at the audience. */
+     palette and fonts. It mirrors the deck URL carried by the sync messages in an
+     iframe, navigated by the deck's own #/h/v/f fragment — the deck itself decides
+     how to display each slide (themes/followers.js shows a slide's hidden
+     .followers block when embedded). This page only owns the chrome. */
   html, body { height: 100%; }
   [hidden] { display: none !important; }
   body {
@@ -37,36 +38,13 @@
 
   main { flex: 1; min-height: 0; position: relative; }
 
-  /* — mirror mode: the deck itself, scaled like reveal.js does — */
+  /* the deck itself, scaled like reveal.js does */
   #mirror { position: absolute; inset: 0; }
   #mirror iframe {
     position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px;
     border: 1px solid #2a3550; border-radius: 4px; background: #0f1829;
     transform: translate(-50%, -50%) scale(1); transform-origin: center;
   }
-
-  /* — followers mode: the slide's .followers block — */
-  #followers { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 400px; min-height: 0; }
-  #codewrap { overflow: auto; padding: 18px 0 18px 24px; }
-  .blockhead { font: 600 11px 'IBM Plex Mono', monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--cutebugs-slate); margin: 18px 0 8px; }
-  .code {
-    margin: 0 24px 0 0; padding: 10px 0; background: #0b1424; border: 1px solid #2a3550; border-radius: 8px;
-    font: 13.5px/1.7 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; white-space: pre;
-  }
-  .ln { display: block; padding: 0 18px 0 0; opacity: .62; transition: opacity .25s, background .25s; }
-  .ln .no { display: inline-block; width: 3.2em; text-align: right; margin-right: 1.4em; color: #4a5876; user-select: none; }
-  .ln.hl { opacity: 1; background: var(--cutebugs-panel); box-shadow: inset 3px 0 0 var(--cutebugs-blue); }
-  .c-kw { color: var(--cutebugs-blue); } .c-str { color: var(--cutebugs-green); }
-  .c-com { color: var(--cutebugs-slate); font-style: italic; } .c-num { color: var(--cutebugs-orange); }
-  .c-fn { color: var(--cutebugs-cyan); }
-  #side { border-left: 1px solid #2a3550; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; min-height: 0; }
-  #status { font: 500 12px 'IBM Plex Mono', monospace; color: var(--cutebugs-slate); }
-  #status b { color: var(--cutebugs-cyan); font-weight: 500; }
-  #cap { font-size: 17px; line-height: 1.45; background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-blue); padding: 12px 16px; }
-  #tracebox { font: 13px/1.7 'IBM Plex Mono', monospace; color: var(--cutebugs-cyan); background: #0b1424; border: 1px solid #2a3550; border-radius: 8px; padding: 10px 14px; }
-  #tracebox small { display: block; color: var(--cutebugs-slate); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; }
-  #side .hint { margin-top: auto; font-size: 12.5px; color: var(--cutebugs-slate); }
-  #side .hint code { font-family: 'IBM Plex Mono', monospace; color: var(--cutebugs-cyan); }
 
   footer { flex: none; display: flex; align-items: center; justify-content: center; gap: 14px; padding: 8px; border-top: 1px solid #2a3550; background: #0f1829; }
   footer button { font: 600 16px/1 'IBM Plex Mono', monospace; width: 40px; height: 30px; border-radius: 6px; border: 1px solid #2a3550; background: none; color: var(--cutebugs-ink); cursor: pointer; }
@@ -80,28 +58,14 @@
 </head>
 <body>
 <header>
-  <div class="hd">LLM Inference <small>· followers</small></div>
+  <div class="hd">followers <small id="deckname"></small></div>
   <div class="sync">
     <span class="live" id="live"><i></i>LIVE</span>
     <button class="follow is-on" id="follow">following</button>
   </div>
 </header>
 
-<main>
-  <div id="mirror" hidden></div>
-  <div id="followers" hidden>
-    <div id="codewrap"></div>
-    <aside id="side">
-      <div id="status">waiting for the presenter…</div>
-      <div id="cap"></div>
-      <div id="tracebox"><small>at this step</small><div id="trace">—</div></div>
-      <div class="hint">
-        The code and its line numbers are the course repo's <code>attention.py</code>.
-        Scroll or step manually to detach; the red button rejoins the presenter.
-      </div>
-    </aside>
-  </div>
-</main>
+<main><div id="mirror" hidden></div></main>
 
 <footer hidden>
   <button id="prev" title="previous step">‹</button>
@@ -116,132 +80,55 @@
 </div>
 
 <script>
-// ------------------------------------------------------------------- rendering
+// ------------------------------------------------------------------- chrome
 const $ = (s) => document.querySelector(s);
-const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-
-function highlight(src) {                              // tiny stand-in for pygments
-  const re = /("""(?:[^"]|"(?!""))*"""|"(?:[^"\\]|\\.)*")|(#[^\n]*)|\b(def|return|for|in|if|import|while|and|or|not|None|True|False)\b|\b(np|softmax|attention|attention_manual)\b|\b(\d[\d_]*)\b/g;
-  let out = '', at = 0, m;
-  while ((m = re.exec(src))) {
-    out += esc(src.slice(at, m.index));
-    const cls = m[1] ? 'c-str' : m[2] ? 'c-com' : m[3] ? 'c-kw' : m[4] ? 'c-fn' : 'c-num';
-    out += `<span class="${cls}">${esc(m[0])}</span>`;
-    at = m.index + m[0].length;
-  }
-  return out + esc(src.slice(at));
-}
-
-// ------------------------------------------------- which deck lives where
-// deck name (from the sync messages) → the deck's HTML, fetched for the .followers
-// blocks and loaded in the mirror iframe. Relative to this page.
-const DECKS = {
-  'sync-mock': 'mockups/sync-presenter.html',
-  'llm-inference': 'llm-inference.html',
-  'next-word-prediction': 'next-word-prediction.html',
-};
-
-let deckUrl = null, sections = null, frame = null, curSlide = null;
-let caps = [], trace = [], nSteps = 0, step = 0;
-let lastMsg = null, following = true;
-
-function ensureDeck(file) {
-  if (deckUrl === file) return;
-  deckUrl = file;
-  fetch(file).then((r) => r.text()).then((html) => {
-    sections = [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('.reveal .slides > section')];
-    if (lastMsg) render(lastMsg);                      // re-render now that the deck is parsed
-  }).catch(() => { $('#status').textContent = `could not load ${file}`; });
-}
-
-// — mirror mode: the deck in an iframe, navigated by its own #/h/v/f hash —
-function showMirror(st) {
-  $('#followers').hidden = true;
-  $('#mirror').hidden = false;
-  $('footer').hidden = true;
-  if (!frame) {
-    frame = document.createElement('iframe');
-    frame.title = 'mirrored slide';
-    frame.addEventListener('load', () => {             // the embedded deck's own keys strip is noise
-      try { frame.contentDocument.getElementById('keys')?.remove(); } catch {}
-    });
-    $('#mirror').append(frame);
-  }
-  fit();
-  const h = `#/${st.h}/${st.s}/${Math.max(st.f, 0)}`;  // reveal 5: fragments ride in the hash
-  if (frame.dataset.h !== h) {
-    frame.dataset.h = h;
-    if (frame.src) frame.contentWindow.location.hash = h;
-    else frame.src = deckUrl + h;
-  }
-  $('#status').textContent = 'mirroring the presenter';
-}
-
-function fit() {
-  if (!frame) return;
-  const { width, height } = $('#mirror').getBoundingClientRect();
-  const k = Math.min(width / 1280, height / 720);
-  frame.style.transform = `translate(-50%, -50%) scale(${k})`;
-}
-window.addEventListener('resize', fit);
-
-// — followers mode: the slide's .followers block —
-function showFollowers(stu, st) {
-  $('#mirror').hidden = true;
-  $('#followers').hidden = false;
-  $('footer').hidden = false;
-  if (curSlide !== stu) {                              // rebuild only when the slide changes
-    curSlide = stu;
-    caps = [...stu.querySelectorAll('.caps > p')].map((p) => p.innerHTML);
-    trace = [...stu.querySelectorAll('.trace > p')].map((p) => p.innerHTML);
-    nSteps = caps.length;
-    const wrap = $('#codewrap');
-    wrap.innerHTML = '';
-    stu.querySelectorAll('pre.code').forEach((pre) => {
-      const label = document.createElement('div');
-      label.className = 'blockhead';
-      label.textContent = pre.dataset.label || '';
-      const out = document.createElement('pre');
-      out.className = 'code';
-      out.innerHTML = [...pre.querySelectorAll('.ln')].map((ln) =>
-        `<span class="ln" data-n="${ln.dataset.n}" data-s="${ln.dataset.s || ''}"><span class="no">${ln.dataset.n}</span>${highlight(ln.textContent) || ' '}</span>`
-      ).join('');
-      wrap.append(label, out);
-    });
-  }
-  const title = stu.closest('section')?.querySelector('h1')?.textContent || '';
-  $('#status').innerHTML = `slide <b>${st.h + 1}</b> « ${esc(title)} »`;
-  setStep(Math.min(Math.max(st.f + 1, 0), nSteps));
-}
-
-function setStep(k) {
-  step = Math.min(Math.max(k, 0), nSteps);
-  document.querySelectorAll('#codewrap .ln').forEach((ln) =>
-    ln.classList.toggle('hl', step > 0 && (ln.dataset.s || '').split(' ').includes(String(step))));
-  $('#stepno').textContent = `step ${step} / ${nSteps}`;
-  $('#cap').innerHTML = step === 0 ? 'press → in the deck…' : caps[step - 1] || '';
-  $('#trace').innerHTML = step === 0 ? '—' : trace[step - 1] || '';
-  const first = $('#codewrap .ln.hl');
-  if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
-}
-
-// ------------------------------------------------------------------ the sync
-// The ntfy.sh topic is the password: the deck's « followers » button (key L) picks a
-// random suffix and shows its QR. ?ch= wins over localStorage (same origin as the
-// deck). ?demo steps without any network.
 const params = new URLSearchParams(location.search);
 const CH = params.get('ch') || localStorage.getItem('syncTopic') || '';
 
-function render(st) {
-  const file = DECKS[st.deck];
-  if (!file) { $('#status').textContent = `unknown deck « ${st.deck} »`; return; }
-  ensureDeck(file);
-  if (!sections) { $('#status').textContent = 'loading the deck…'; return; }
-  const sec = sections[st.h];
-  const stu = sec && [...sec.children].find((e) => e.classList.contains('followers'));
-  if (stu) showFollowers(stu, st); else showMirror(st);
+let frame = null, lastMsg = null, following = true, nSteps = 0, cur = null;
+
+function ensureFrame() {
+  if (frame) return;
+  frame = document.createElement('iframe');
+  frame.title = 'mirrored slide';
+  frame.addEventListener('load', () => {                // the embedded deck's own keys strip is noise
+    try { frame.contentDocument.getElementById('keys')?.remove(); } catch {}
+  });
+  $('#mirror').append(frame);
 }
 
+// Point the mirror at the state's deck URL and fragment. Same-origin fragments
+// are switched in place; anything else reloads the iframe (from the HTTP cache).
+function show(st) {
+  $('#mirror').hidden = false;
+  ensureFrame();
+  const frag = `#/${st.h}/${st.s}/${Math.max(st.f, 0)}`;
+  if (frame.dataset.base !== st.url) {
+    frame.dataset.base = st.url;
+    frame.dataset.frag = frag;
+    frame.src = st.url + frag;
+  } else if (frame.dataset.frag !== frag) {
+    frame.dataset.frag = frag;
+    try { frame.contentWindow.location.hash = frag; }
+    catch { frame.src = st.url + frag; }
+  }
+}
+
+function apply(st) { cur = st; show(st); }
+
+// The embedded deck reports whether the current slide has followers content and
+// where its step stands — that is all the footer knows about the deck.
+window.addEventListener('message', (e) => {
+  const m = e.data;
+  if (!m || m.type !== 'followers') return;
+  $('footer').hidden = !m.active;
+  if (m.active) {
+    nSteps = m.nSteps;
+    $('#stepno').textContent = `step ${m.step} / ${m.nSteps}`;
+  }
+});
+
+// ------------------------------------------------------- detach and rejoin
 function detach() {
   if (!following) return;
   following = false;
@@ -254,16 +141,20 @@ $('#follow').onclick = $('#rejoin').onclick = () => {
   $('#follow').classList.add('is-on');
   $('#follow').textContent = 'following';
   $('#rejoin').hidden = true;
-  if (lastMsg) render(lastMsg);
+  if (lastMsg) apply(lastMsg);
 };
-$('#prev').onclick = () => { detach(); setStep(step - 1); };
-$('#next').onclick = () => { detach(); setStep(step + 1); };
-$('#codewrap').addEventListener('wheel', detach, { passive: true });
+$('#prev').onclick = () => { detach(); if (cur) apply({ ...cur, f: Math.min(Math.max(cur.f, 0) - 1, nSteps - 1) }); };
+$('#next').onclick = () => { detach(); if (cur) apply({ ...cur, f: Math.min(Math.max(cur.f, 0) + 1, nSteps - 1) }); };
 
+// ------------------------------------------------------------------ the sync
+// The ntfy.sh topic is the password: the deck's « follow along » button (key L) picks
+// a random suffix and shows its QR. ?ch= wins over localStorage (same origin as the
+// deck). ?demo steps through the mock deck without any network.
 if (params.has('demo')) {
   $('#demo').hidden = false;
+  const mock = new URL('mockups/sync-presenter.html', location).href;
   let h = 0, f = -1;
-  const push = () => { lastMsg = { ver: 1, deck: 'sync-mock', h, s: 0, f, t: Date.now() }; if (following) render(lastMsg); };
+  const push = () => apply({ ver: 2, url: mock, h, s: 0, f, t: Date.now() });
   $('#d-prev').onclick = () => { h = (h + 2) % 3; f = -1; push(); };
   $('#d-next').onclick = () => { h = (h + 1) % 3; f = -1; push(); };
   $('#d-step').onclick = () => { f = (f + 1) % 13; push(); };
@@ -276,12 +167,12 @@ if (params.has('demo')) {
     let ev; try { ev = JSON.parse(e.data); } catch { return; }
     if (!ev.message) return;                                 // keep-alives etc.
     let st; try { st = JSON.parse(ev.message); } catch { return; }
-    if (st.ver !== 1 || (lastMsg && st.t <= lastMsg.t)) return;   // drop replays of old states
+    if (st.ver !== 2 || (lastMsg && st.t <= lastMsg.t)) return;   // drop replays of old states
     lastMsg = st;
-    if (following) render(st);
+    if (following) apply(st);
   };
 } else {
-  $('#status').innerHTML = 'no channel yet — press <b>L</b> in the deck, or add <b>?ch=…</b> / <b>?demo</b> to this URL';
+  $('#deckname').textContent = 'no channel yet — press L in the deck, or add ?ch=… (or ?demo) to this URL';
 }
 </script>
 </body>

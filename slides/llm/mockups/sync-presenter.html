@@ -52,10 +52,11 @@
 </div>
 </div>
 
-<!-- Content aimed at the followers: hidden on the projector, extracted by the
-     follower view (follower.html). Lines carry their file line number (data-n) and
-     the slide steps they belong to (data-s); this is what tools/code_slide.py will
-     emit from the `# » s…` sentinel comments of the real attention.py. -->
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). Lines
+     carry their file line number (data-n) and the slide steps they belong to
+     (data-s); this is what tools/code_slide.py will emit from the `# » s…` sentinel
+     comments of the real attention.py. -->
 <div class="followers" hidden>
 <pre class="code" data-label="attention.py — the slide, with matrices"><code><span class="ln" data-n="1">import numpy as np</span>
 <span class="ln" data-n="2"></span>
@@ -145,7 +146,8 @@
 <script src="../vendor/reveal/reveal.js"></script>
 <script src="../vendor/reveal/notes.js"></script>
 <script src="../themes/deck.js"></script>
-<script src="../themes/sync.js" data-topic-base="inria-llm-mock" data-deck="sync-mock" data-follower="../follower.html"></script>
+<script src="../themes/sync.js" data-topic-base="inria-llm-mock" data-follower="../follower.html"></script>
 <script src="../themes/sync-qr.js"></script>
+<script src="../themes/followers.js"></script>
 </body>
 </html>
