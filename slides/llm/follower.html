@@ -38,12 +38,13 @@
 
   main { flex: 1; min-height: 0; position: relative; }
 
-  /* the deck itself, scaled like reveal.js does */
+  /* The deck fills the available area at native size: reveal.js scales the slide
+     itself (minScale/maxScale), so this adapts to any window, portrait or
+     landscape, with no geometry math here. */
   #mirror { position: absolute; inset: 0; }
   #mirror iframe {
-    position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px;
-    border: 1px solid #2a3550; border-radius: 4px; background: #0f1829;
-    transform: translate(-50%, -50%) scale(1); transform-origin: center;
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    border: none; background: #0f1829;
   }
 
   footer { flex: none; display: flex; align-items: center; justify-content: center; gap: 14px; padding: 8px; border-top: 1px solid #2a3550; background: #0f1829; }
@@ -54,6 +55,18 @@
   #rejoin button { font: 500 12.5px 'IBM Plex Sans', sans-serif; padding: 6px 14px; border-radius: 14px; cursor: pointer; color: #05080e; background: var(--cutebugs-red); border: none; }
   #demo { position: fixed; right: 16px; top: 60px; z-index: 9; background: #18233a; border: 1px solid #2a3550; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--cutebugs-slate); }
   #demo button { display: block; width: 100%; margin: 4px 0; }
+
+  /* phones: tighter chrome, touch-sized footer buttons */
+  @media (max-width: 640px), (max-height: 560px) {
+    header { padding: 8px 12px; gap: 12px; }
+    header .hd { font-size: 14px; }
+    .follow { padding: 6px 12px; }
+    footer { padding: 6px; gap: 10px; }
+    footer button { width: 72px; height: 40px; }
+    #stepno { font-size: 12px; min-width: 6em; }
+    #rejoin { right: 12px; bottom: 58px; }
+    #demo { right: 12px; left: 12px; top: 56px; }
+  }
 </style>
 </head>
 <body>

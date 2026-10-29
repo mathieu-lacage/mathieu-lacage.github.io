@@ -35,6 +35,18 @@
                 border: 1px solid #2a3550; border-radius: 8px; padding: 10px 14px; }
     #fv-trace small { display: block; color: var(--cutebugs-slate, #8e95a2); font-size: 10px;
                       letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; }
+    /* phones (portrait or landscape): the code takes the whole width, the caption
+       and trace move below it — the follower page sizes the iframe to the window,
+       so these queries see the real device size. */
+    @media (max-width: 820px), (max-height: 560px) {
+      #followers-view { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+      #fv-code { padding: 12px 0 12px 14px; }
+      .fv-code { margin: 0 14px 0 0; font-size: 12px; }
+      #fv-side { border-left: none; border-top: 1px solid #2a3550; padding: 10px 14px; gap: 8px;
+                 max-height: 45%; overflow: auto; }
+      #fv-cap { font-size: 14px; padding: 10px 12px; }
+      #fv-trace { font-size: 12px; padding: 8px 12px; }
+    }
   </style>`);
 
   const view = document.createElement('div');

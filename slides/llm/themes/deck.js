@@ -26,6 +26,9 @@
   Reveal.initialize({
     width: 1280, height: 720, margin: margin(), minScale: 0.1, maxScale: 4,
     center: false, display: 'flex',
+    // the embedded follower iframe is phone-sized: keep the slide view at any
+    // width (reveal's scroll view crashes on narrow iframes)
+    scrollActivationWidth: null,
     controls: false, progress: false, hash: true, transition: 'none', backgroundTransition: 'none',
     // PDF (?print-pdf): one page per slide, every fragment shown
     pdfSeparateFragments: false, pdfMaxPagesPerSlide: 1,
