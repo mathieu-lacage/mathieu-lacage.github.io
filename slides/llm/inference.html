@@ -194,6 +194,29 @@ n rows x_j into X and every per-token product becomes one matrix product.
 The mask keeps each token from reading later tokens (j ≤ i), which the
 per-token sum did by stopping at n.
 </aside>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The
+     matrix-form code matching the right-hand column; the steps are the eqgrid's
+     (one per table row), lines carry their file line number (data-n) and the
+     steps they belong to (data-s). -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1">def attention(X, Wq, Wk, Wv, Wo):</span>
+<span class="ln" data-n="2">    """X stacks the n input rows x_i"""</span>
+<span class="ln" data-n="3">    n, dh = len(X), Wq.shape[1]</span>
+<span class="ln" data-n="4" data-s="1">    Q = X @ Wq</span>
+<span class="ln" data-n="5" data-s="2">    K = X @ Wk</span>
+<span class="ln" data-n="6" data-s="3">    V = X @ Wv</span>
+<span class="ln" data-n="7" data-s="4">    M = np.zeros((n, n))</span>
+<span class="ln" data-n="8" data-s="4">    M[np.triu_indices(n, 1)] = -np.inf</span>
+<span class="ln" data-n="9" data-s="5">    Z = softmax(Q @ K.T / np.sqrt(dh) + M) @ V</span>
+<span class="ln" data-n="10" data-s="6">    Y = X + Z @ Wo</span>
+<span class="ln" data-n="11" data-s="6">    return Y</span>
+</code>
+</pre>
+</div>
 </section>
 
 <!-- ================================================================ -->
