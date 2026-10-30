@@ -190,8 +190,10 @@
     tocBuilt = true;
   }
 
-  // The overview lists the slides up to the furthest the deck has been (maxH):
-  // wherever the presenter went — or the follower walked — sets the frontier.
+  // The overview lists the slides up to the presenter's frontier (maxH), which
+  // the follower page tracks from the sync history and posts in — the deck
+  // itself never decides what has been « reached » (its own state also moves
+  // when the follower browses detached).
   let maxH = 0;
   let tocMode = 'list';
   try { tocMode = localStorage.getItem('fv-toc-mode') || 'list'; } catch {}
@@ -269,7 +271,6 @@
     const sec = window.Reveal && Reveal.getCurrentSlide();
     const fol = sec && [...sec.children].find((e) => e.classList.contains('followers'));
     const i = Reveal.getIndices();
-    maxH = Math.max(maxH, i.h);
     view.hidden = false;                                 // the view is unconditional now
     let step = 0, nSteps = 0;
     if (fol) {
@@ -302,6 +303,15 @@
     view.classList.toggle('mirror', mirroring);
     window.parent.postMessage({ type: 'followers', active: !mirroring, step, nSteps, title: document.title }, '*');
   }
+
+  // The follower page owns the presenter frontier (from the sync history) and
+  // posts it here; the overview never shows past it.
+  window.addEventListener('message', (e) => {
+    const m = e.data;
+    if (!m || m.type !== 'followers-frontier' || m.h === maxH) return;
+    maxH = m.h;
+    if (window.Reveal && Reveal.isReady()) render();
+  });
 
   // Navigation keys belong to the follower page: there they cross slides and
   // steps, and the follower page owns the detached state. Keep them away from

@@ -110,6 +110,7 @@ function ensureFrame() {
       // a hash written while the document was still loading was lost: re-apply
       // the newest pending state now that the frame has committed its URL
       if (frame.dataset.frag) frame.contentWindow.location.hash = frame.dataset.frag;
+      postFrontier();                                  // the deck just booted: hand it the frontier
     } catch {}
   });
   $('#mirror').append(frame);
@@ -137,6 +138,20 @@ function show(st) {
 
 function apply(st) { cur = st; show(st); }
 
+// The frontier: the furthest slide/step the presenter has ever shown, tracked
+// from the sync history (not from what this page happens to display). Nothing
+// may go past it — not the detached walk, not the deck's overview — and the
+// deck is kept posted so its overview matches.
+let maxH = 0, maxF = -1;
+function present(st) {
+  if (st.h > maxH || (st.h === maxH && st.f > maxF)) { maxH = st.h; maxF = st.f; }
+  if (following) apply(st);
+  postFrontier();
+}
+function postFrontier() {
+  try { frame?.contentWindow.postMessage({ type: 'followers-frontier', h: maxH, f: maxF }, '*'); } catch {}
+}
+
 // Detached navigation walks the mirrored deck's own steps, across slides: the
 // step counts come from the deck itself (same origin). f = -1 — slide shown, no
 // step yet — participates in the walk like any step, so ← from a slide's first
@@ -163,6 +178,9 @@ function stepNav(delta) {
     if (h >= nSlides() - 1) { f = stepsOf(h) - 1; break; }
     f -= stepsOf(h) + 1; h++;
   }
+  if (h > maxH || (h === maxH && f > maxF)) {          // never past the presenter's frontier
+    h = maxH; f = maxF;
+  }
   apply({ ...cur, h, f });
 }
 
@@ -174,7 +192,7 @@ window.addEventListener('message', (e) => {
   if (m.title) $('#deckname').textContent = m.title;   // « following TITLE »
   if (m.select !== undefined) {                        // a past slide picked in the overview
     if (cur && !(following && cur.h === m.select)) {   // picking the slide we're on: no-op
-      detach(); apply({ ...cur, h: m.select, f: -1 });
+      detach(); apply({ ...cur, h: Math.min(m.select, maxH), f: -1 });
     }
     window.focus();                                    // keys go back to this page
     return;
@@ -225,7 +243,7 @@ if (params.has('demo')) {
   $('#demo').hidden = false;
   const mock = new URL('mockups/sync-presenter.html', location).href;
   let h = 0, f = -1;
-  const push = () => apply({ ver: 2, url: mock, h, s: 0, f, t: Date.now() });
+  const push = () => present({ ver: 2, url: mock, h, s: 0, f, t: Date.now() });
   $('#d-prev').onclick = () => { h = (h + 2) % 3; f = -1; push(); };
   $('#d-next').onclick = () => { h = (h + 1) % 3; f = -1; push(); };
   $('#d-step').onclick = () => { f = (f + 1) % 13; push(); };
@@ -240,7 +258,7 @@ if (params.has('demo')) {
     let st; try { st = JSON.parse(ev.message); } catch { return; }
     if (st.ver !== 2 || (lastMsg && st.t <= lastMsg.t)) return;   // drop replays of old states
     lastMsg = st;
-    if (following) apply(st);
+    present(st);
   };
 } else {
   $('#deckname').textContent = 'no channel yet — press L in the deck, or add ?ch=… (or ?demo) to this URL';
