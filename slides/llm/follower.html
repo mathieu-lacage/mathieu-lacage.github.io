@@ -71,7 +71,7 @@
 </head>
 <body>
 <header>
-  <div class="hd">followers <small id="deckname"></small></div>
+  <div class="hd">following <small id="deckname"></small></div>
   <div class="sync">
     <span class="live" id="live"><i></i>LIVE</span>
     <button class="follow is-on" id="follow">following</button>
@@ -171,8 +171,11 @@ function stepNav(delta) {
 window.addEventListener('message', (e) => {
   const m = e.data;
   if (!m || m.type !== 'followers') return;
+  if (m.title) $('#deckname').textContent = m.title;   // « following TITLE »
   if (m.select !== undefined) {                        // a past slide picked in the overview
-    if (cur) { detach(); apply({ ...cur, h: m.select, f: -1 }); }
+    if (cur && !(following && cur.h === m.select)) {   // picking the slide we're on: no-op
+      detach(); apply({ ...cur, h: m.select, f: -1 });
+    }
     window.focus();                                    // keys go back to this page
     return;
   }

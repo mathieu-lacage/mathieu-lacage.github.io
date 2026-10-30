@@ -1,7 +1,10 @@
 // The followers view of the deck itself. When the deck is embedded in the follower
-// page (an iframe of follower.html), slides that carry a hidden .followers block
-// display that instead of the projector's slide: the code aimed at the audience,
-// with the caption and trace of the current step. The standalone deck is untouched.
+// page (an iframe of follower.html) this view replaces the projector's layout:
+// slides that carry a hidden .followers block display that code aimed at the
+// audience, with the caption and trace of the current step; every other slide is
+// simply mirrored (the view is transparent there). The right column is always the
+// slide overview — everything up to the current slide, each entry clickable. The
+// standalone deck is untouched.
 //
 // Steps are Reveal's own fragment index, so the follower page drives them with the
 // deck URL's #/h/v/f fragment — the deck needs nothing but its own state. The step
@@ -12,10 +15,19 @@
 
   document.head.insertAdjacentHTML('beforeend', `<style>
     #followers-view { position: fixed; inset: 0; z-index: 50; display: grid; grid-template-columns: 1fr 400px;
-                      min-height: 0; background: #05080e; color: var(--cutebugs-ink, #e3e9f3);
+                      min-height: 0; color: var(--cutebugs-ink, #e3e9f3);
                       font: 15px/1.5 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; }
     #followers-view[hidden] { display: none !important; }
-    #fv-code { overflow: auto; padding: 18px 0 18px 24px; }
+    /* The view is unconditional: slides with a .followers block show that code on
+       the left; every other slide is mirrored as-is — .mirror makes the left
+       column paint nothing so the projector's slide shows through the overlay,
+       and the deck's own layout shrinks to keep clear of the overview column. */
+    #fv-main { display: flex; flex-direction: column; min-height: 0; background: #05080e; }
+    #followers-view.mirror #fv-main { background: none; }
+    #followers-view.mirror #fv-code, #followers-view.mirror #fv-cap,
+    #followers-view.mirror #fv-trace { display: none; }
+    body.fv-mirror .reveal { width: calc(100% - 400px); }
+    #fv-code { overflow: auto; flex: 1; min-height: 0; padding: 18px 0 18px 24px; }
     .fv-head { font: 600 11px 'IBM Plex Mono', monospace; letter-spacing: .12em; text-transform: uppercase;
                color: var(--cutebugs-slate, #8e95a2); margin: 18px 0 8px; }
     .fv-code { margin: 0 24px 0 0; padding: 10px 0; background: #0b1424; border: 1px solid #2a3550; border-radius: 8px;
@@ -26,9 +38,9 @@
     .fv-kw { color: var(--cutebugs-blue, #4aa8ff); } .fv-str { color: var(--cutebugs-green, #7bc86c); }
     .fv-com { color: var(--cutebugs-slate, #8e95a2); font-style: italic; } .fv-num { color: var(--cutebugs-orange, #f5a97f); }
     .fv-fn { color: var(--cutebugs-cyan, #8fc5fa); }
-    #fv-side { border-left: 1px solid #2a3550; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: auto; }
+    #fv-toc-wrap { border-left: 1px solid #2a3550; padding: 18px 22px; display: flex; min-height: 0; background: #05080e; }
     /* where we are: every slide up to the current one, the current highlighted.
-       The list scrolls on its own; the caption and trace below keep their size. */
+       The list scrolls on its own and is on screen on every slide. */
     #fv-toc { flex: 1; min-height: 0; overflow: auto; font: 12.5px/1.9 'IBM Plex Sans', sans-serif; }
     #fv-toc .toc-e { display: flex; gap: 10px; align-items: baseline; padding: 0 10px 0 8px; border-left: 3px solid transparent;
                      color: var(--cutebugs-slate, #8e95a2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -39,9 +51,9 @@
     #fv-toc .toc-e.toc-title { font-family: 'IBM Plex Sans Condensed', sans-serif; font-weight: 600; }
     #fv-toc .toc-e.cur { color: var(--cutebugs-ink, #e3e9f3); border-left-color: var(--cutebugs-blue, #4aa8ff);
                          background: var(--cutebugs-panel, #18233a); }
-    #fv-cap { font-size: 17px; line-height: 1.45; background: var(--cutebugs-panel, #18233a);
+    #fv-cap { flex: none; margin: 0 24px 12px; font-size: 17px; line-height: 1.45; background: var(--cutebugs-panel, #18233a);
               border-left: 6px solid var(--cutebugs-blue, #4aa8ff); padding: 12px 16px; }
-    #fv-trace { font: 13px/1.7 'IBM Plex Mono', monospace; color: var(--cutebugs-cyan, #8fc5fa); background: #0b1424;
+    #fv-trace { flex: none; margin: 0 24px 18px; font: 13px/1.7 'IBM Plex Mono', monospace; color: var(--cutebugs-cyan, #8fc5fa); background: #0b1424;
                 border: 1px solid #2a3550; border-radius: 8px; padding: 10px 14px; }
     #fv-trace small { display: block; color: var(--cutebugs-slate, #8e95a2); font-size: 10px;
                       letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; }
@@ -55,22 +67,22 @@
       #followers-view { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
       #fv-code { padding: 12px 0 12px 14px; }
       .fv-code { margin: 0 14px 0 0; font-size: 12px; }
-      #fv-side { border-left: none; border-top: 1px solid #2a3550; padding: 10px 14px; gap: 8px; }
-      #fv-toc { flex: none; max-height: 30vh; }
-      #fv-cap { font-size: 14px; padding: 10px 12px; }
-      #fv-trace { font-size: 12px; padding: 8px 12px; }
+      #fv-toc-wrap { border-left: none; border-top: 1px solid #2a3550; padding: 10px 14px; max-height: 30vh; }
+      body.fv-mirror .reveal { width: 100%; }
+      #fv-cap { margin: 0 14px 10px; font-size: 14px; padding: 10px 12px; }
+      #fv-trace { margin: 0 14px 12px; font-size: 12px; padding: 8px 12px; }
     }
   </style>`);
 
   const view = document.createElement('div');
   view.id = 'followers-view';
   view.hidden = true;
-  view.innerHTML = `<div id="fv-code"></div>
-    <aside id="fv-side">
-      <nav id="fv-toc" hidden></nav>
+  view.innerHTML = `<div id="fv-main">
+      <div id="fv-code"></div>
       <div id="fv-cap"></div>
       <div id="fv-trace"><small>at this step</small><div id="fv-tracein">—</div></div>
-    </aside>`;
+    </div>
+    <aside id="fv-toc-wrap"><nav id="fv-toc" hidden></nav></aside>`;
   document.body.append(view);
 
   const $ = (s) => view.querySelector(s);
@@ -149,26 +161,34 @@
   function render() {
     const sec = window.Reveal && Reveal.getCurrentSlide();
     const fol = sec && [...sec.children].find((e) => e.classList.contains('followers'));
-    if (!fol) {                                          // no followers content: mirror the slide
-      view.hidden = true;
-      window.parent.postMessage({ type: 'followers', active: false }, '*');
-      return;
-    }
-    let b = built.get(fol);
-    if (!b) { b = build(fol); built.set(fol, b); }
-    $('#fv-code').replaceChildren(b.box);
-    $('#fv-trace').hidden = b.trace.length === 0;        // code-only block: no trace panel
     const i = Reveal.getIndices();
-    const step = Math.min(Math.max((i.f === undefined ? -1 : i.f) + 1, 0), b.nSteps);
-    setStep(b, step);
+    let step = 0, nSteps = 0;
+    if (fol) {
+      let b = built.get(fol);
+      if (!b) { b = build(fol); built.set(fol, b); }
+      $('#fv-code').replaceChildren(b.box);
+      $('#fv-trace').hidden = b.trace.length === 0;      // code-only block: no trace panel
+      step = Math.min(Math.max((i.f === undefined ? -1 : i.f) + 1, 0), b.nSteps);
+      nSteps = b.nSteps;
+      setStep(b, step);
+    }
+    // The overview is on screen on every slide: slides up to now, the current
+    // one highlighted. In mirror mode the deck's own layout shrinks by the
+    // column's width so the slide stays clear of it.
     if (!tocBuilt) buildToc();
     [...$('#fv-toc').children].forEach((e, k) => {
       e.hidden = k > i.h;                                // only the slides up to now
       e.classList.toggle('cur', k === i.h);
     });
     $('#fv-toc').querySelector('.cur')?.scrollIntoView({ block: 'nearest' });
+    const mirroring = !fol;
+    if (document.body.classList.contains('fv-mirror') !== mirroring) {
+      document.body.classList.toggle('fv-mirror', mirroring);
+      Reveal.layout();                                   // re-scale into the reduced area
+    }
+    view.classList.toggle('mirror', mirroring);
     view.hidden = false;
-    window.parent.postMessage({ type: 'followers', active: true, step, nSteps: b.nSteps }, '*');
+    window.parent.postMessage({ type: 'followers', active: !mirroring, step, nSteps, title: document.title }, '*');
   }
 
   // Navigation keys belong to the follower page: there they cross slides and
