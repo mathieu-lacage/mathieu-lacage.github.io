@@ -1,10 +1,11 @@
 // The followers view of the deck itself. When the deck is embedded in the follower
-// page (an iframe of follower.html) this view replaces the projector's layout:
-// slides that carry a hidden .followers block display that code aimed at the
-// audience, with the caption and trace of the current step; every other slide is
-// simply mirrored (the view is transparent there). The right column is always the
-// slide overview — everything up to the current slide, each entry clickable. The
-// standalone deck is untouched.
+// page (an iframe of follower.html) the view augments the projector's layout:
+// slides that carry a hidden .followers block keep the slide on top as the
+// reference — stepping in sync with it — and display that block's code, caption
+// and trace below; every other slide is simply mirrored (the view is transparent
+// there). The right column is always the slide overview — everything up to the
+// furthest slide reached, as titles or miniatures. The standalone deck is
+// untouched.
 //
 // Steps are Reveal's own fragment index, so the follower page drives them with the
 // deck URL's #/h/v/f fragment — the deck needs nothing but its own state. The step
@@ -22,11 +23,16 @@
        the left; every other slide is mirrored as-is — .mirror makes the left
        column paint nothing so the projector's slide shows through the overlay,
        and the deck's own layout shrinks to keep clear of the overview column. */
-    #fv-main { display: flex; flex-direction: column; min-height: 0; background: #05080e; }
-    #followers-view.mirror #fv-main { background: none; }
-    #followers-view.mirror #fv-code, #followers-view.mirror #fv-cap,
-    #followers-view.mirror #fv-trace { display: none; }
+    #fv-main { display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 45%); min-height: 0; }
+    #followers-view.mirror #fv-main { grid-template-rows: minmax(0, 1fr) 0; }
+    #followers-view.mirror #fv-content { display: none; }
+    /* On follower-content slides the slide itself stays on top as the reference
+       (its fragments step in sync with the code below): the top row is
+       transparent, and the deck's own layout shrinks by the rendered heights
+       of the bands (--fv-h content, --fv-t overview) so both fit exactly. */
+    body.fv-content .reveal { width: calc(100% - 400px); height: calc(100% - var(--fv-h, 0px)); }
     body.fv-mirror .reveal { width: calc(100% - 400px); }
+    #fv-content { display: flex; flex-direction: column; min-height: 0; background: #05080e; }
     #fv-code { overflow: auto; flex: 1; min-height: 0; padding: 18px 0 18px 24px; }
     .fv-head { font: 600 11px 'IBM Plex Mono', monospace; letter-spacing: .12em; text-transform: uppercase;
                color: var(--cutebugs-slate, #8e95a2); margin: 18px 0 8px; }
@@ -47,7 +53,7 @@
                      cursor: pointer; }
     #fv-toc .toc-e:hover { color: var(--cutebugs-ink, #e3e9f3); }
     #fv-toc .toc-e .no { font: 500 10px 'IBM Plex Mono', monospace; color: #4a5876; min-width: 2em; text-align: right; flex: none; }
-    #fv-toc .toc-e[hidden] { display: none; }
+    #fv-toc .toc-e[hidden] { display: none !important; }
     #fv-toc .toc-e.toc-title { font-family: 'IBM Plex Sans Condensed', sans-serif; font-weight: 600; }
     #fv-toc .toc-e.cur { color: var(--cutebugs-ink, #e3e9f3); border-left-color: var(--cutebugs-blue, #4aa8ff);
                          background: var(--cutebugs-panel, #18233a); }
@@ -87,7 +93,8 @@
       #fv-code { padding: 12px 0 12px 14px; }
       .fv-code { margin: 0 14px 0 0; font-size: 12px; }
       #fv-toc-wrap { border-left: none; border-top: 1px solid #2a3550; padding: 10px 14px; max-height: 30vh; }
-      body.fv-mirror .reveal { width: 100%; }
+      body.fv-mirror .reveal { width: 100%; height: calc(100% - var(--fv-t, 0px)); }
+      body.fv-content .reveal { width: 100%; height: calc(100% - var(--fv-h, 0px) - var(--fv-t, 0px)); }
       #fv-cap { margin: 0 14px 10px; font-size: 14px; padding: 10px 12px; }
       #fv-trace { margin: 0 14px 12px; font-size: 12px; padding: 8px 12px; }
     }
@@ -97,9 +104,12 @@
   view.id = 'followers-view';
   view.hidden = true;
   view.innerHTML = `<div id="fv-main">
-      <div id="fv-code"></div>
-      <div id="fv-cap"></div>
-      <div id="fv-trace"><small>at this step</small><div id="fv-tracein">—</div></div>
+      <div id="fv-ref"></div>
+      <div id="fv-content">
+        <div id="fv-code"></div>
+        <div id="fv-cap"></div>
+        <div id="fv-trace"><small>at this step</small><div id="fv-tracein">—</div></div>
+      </div>
     </div>
     <aside id="fv-toc-wrap">
       <div id="fv-mode"><button data-m="list">titles</button><button data-m="minis">slides</button></div>
@@ -230,7 +240,30 @@
       mini.querySelector('.fv-stage').style.transform = `scale(${mini.clientWidth / 1280})`;
     });
   }
-  window.addEventListener('resize', () => { if (tocMode === 'minis') layoutMinis(); });
+
+  // The deck's own layout must clear the overlay's bands: re-measure them and
+  // re-scale reveal whenever they change — also after font loads (text heights
+  // settle late) and on resize (the band caps are fractions of the viewport).
+  let lastMirror = null;
+  function syncBands() {
+    const mirroring = document.body.classList.contains('fv-mirror');
+    let dirty = mirroring !== lastMirror;
+    lastMirror = mirroring;
+    const setVar = (name, v) => {
+      if (document.body.style.getPropertyValue(name) !== v + 'px') {
+        document.body.style.setProperty(name, v + 'px');
+        dirty = true;
+      }
+    };
+    setVar('--fv-h', mirroring ? 0 : $('#fv-content').offsetHeight);
+    setVar('--fv-t', $('#fv-toc-wrap').offsetHeight);
+    if (dirty && window.Reveal && Reveal.isReady()) {
+      Reveal.layout();
+      if (tocMode === 'minis') layoutMinis();
+    }
+  }
+  document.fonts?.ready.then(syncBands);
+  window.addEventListener('resize', () => { syncBands(); if (tocMode === 'minis') layoutMinis(); });
 
   function render() {
     const sec = window.Reveal && Reveal.getCurrentSlide();
@@ -258,12 +291,14 @@
       if (tocMode === 'minis' && k <= maxH) ensureMini(k);   // a newly reached slide
     });
     $('#fv-toc').querySelector('.cur')?.scrollIntoView({ block: 'nearest' });
+    // Keep the deck's own layout in sync with the overlay's bands: the slide
+    // must stay clear of the overview column and, on follower-content slides,
+    // of the content band below it — the slide remains visible there as the
+    // reference, its fragments stepping in sync with the code.
     const mirroring = !fol;
-    if (document.body.classList.contains('fv-mirror') !== mirroring) {
-      document.body.classList.toggle('fv-mirror', mirroring);
-      Reveal.layout();                                   // re-scale into the reduced area
-      if (tocMode === 'minis') layoutMinis();
-    }
+    document.body.classList.toggle('fv-mirror', mirroring);
+    document.body.classList.toggle('fv-content', !mirroring);
+    syncBands();
     view.classList.toggle('mirror', mirroring);
     window.parent.postMessage({ type: 'followers', active: !mirroring, step, nSteps, title: document.title }, '*');
   }
