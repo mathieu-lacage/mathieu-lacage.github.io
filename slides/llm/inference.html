@@ -138,6 +138,33 @@ and show how it is built from transformed versions of the vectors for the previo
 In the next slide, we generalize and show how this can be expressed as matrix
 operations
 </aside>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The
+     steps are the eqgrid's (one per table row after « input »); lines carry their
+     file line number (data-n) and the steps they belong to (data-s). -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1">def attention(xs, Wq, Wk, Wv, Wo):</span>
+<span class="ln" data-n="2">    """xs is the array of x_i"""</span>
+<span class="ln" data-n="3" data-s="1">    q = xs[-1] @ Wq</span>
+<span class="ln" data-n="4">    dh = Wq.shape[1]</span>
+<span class="ln" data-n="5">    s = np.empty(len(xs))</span>
+<span class="ln" data-n="6">    for i, x in enumerate(xs):</span>
+<span class="ln" data-n="7" data-s="2">        k = x @ Wk</span>
+<span class="ln" data-n="8" data-s="3">        s[i] = q @ k / np.sqrt(dh)</span>
+<span class="ln" data-n="9">    a = np.zeros(len(s))</span>
+<span class="ln" data-n="10">    for i in range(len(s)):</span>
+<span class="ln" data-n="11" data-s="4">        a[i] = np.exp(s[i]) / np.sum(np.exp(s))</span>
+<span class="ln" data-n="12">    z = np.zeros(Wv.shape[1])</span>
+<span class="ln" data-n="13">    for i, x in enumerate(xs):</span>
+<span class="ln" data-n="14" data-s="5">        v = x @ Wv</span>
+<span class="ln" data-n="15" data-s="6">        z = z + a[i] * v</span>
+<span class="ln" data-n="16" data-s="7">    return z @ Wo</span>
+</code>
+</pre>
+</div>
 </section>
 
 <!-- ================================================================ -->
