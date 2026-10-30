@@ -91,6 +91,7 @@
       close();
     } else if (e.key === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey && !/input|textarea/i.test(e.target.tagName)) {
       e.stopImmediatePropagation();
+      e.preventDefault();                    // open() focuses the input: keep the « l » out of it
       open();
     }
   }, true);
