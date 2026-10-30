@@ -38,7 +38,7 @@
     .fv-kw { color: var(--cutebugs-blue, #4aa8ff); } .fv-str { color: var(--cutebugs-green, #7bc86c); }
     .fv-com { color: var(--cutebugs-slate, #8e95a2); font-style: italic; } .fv-num { color: var(--cutebugs-orange, #f5a97f); }
     .fv-fn { color: var(--cutebugs-cyan, #8fc5fa); }
-    #fv-toc-wrap { border-left: 1px solid #2a3550; padding: 18px 22px; display: flex; min-height: 0; background: #05080e; }
+    #fv-toc-wrap { border-left: 1px solid #2a3550; padding: 18px 22px; display: flex; flex-direction: column; min-height: 0; background: #05080e; }
     /* where we are: every slide up to the current one, the current highlighted.
        The list scrolls on its own and is on screen on every slide. */
     #fv-toc { flex: 1; min-height: 0; overflow: auto; font: 12.5px/1.9 'IBM Plex Sans', sans-serif; }
@@ -51,6 +51,25 @@
     #fv-toc .toc-e.toc-title { font-family: 'IBM Plex Sans Condensed', sans-serif; font-weight: 600; }
     #fv-toc .toc-e.cur { color: var(--cutebugs-ink, #e3e9f3); border-left-color: var(--cutebugs-blue, #4aa8ff);
                          background: var(--cutebugs-panel, #18233a); }
+    /* titles or miniatures: the switch sits on top of the column */
+    #fv-mode { flex: none; display: flex; gap: 6px; margin-bottom: 12px; }
+    #fv-mode button { font: 500 10px 'IBM Plex Mono', monospace; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+                      color: var(--cutebugs-slate, #8e95a2); background: none; border: 1px solid #2a3550; border-radius: 10px; padding: 2px 10px; }
+    #fv-mode button.on { color: #05080e; background: var(--cutebugs-blue, #4aa8ff); border-color: var(--cutebugs-blue, #4aa8ff); }
+    #fv-toc .toc-e .mini { display: none; }
+    #fv-toc.minis .toc-e { display: block; border-left-color: transparent; background: none; padding: 0 0 10px 0; }
+    #fv-toc.minis .toc-e .tt { display: none; }
+    #fv-toc.minis .toc-e .no { display: block; margin-bottom: 3px; text-align: left; }
+    #fv-toc.minis .toc-e .mini { display: block; position: relative; aspect-ratio: 16 / 9; overflow: hidden;
+                                 border: 1px solid #2a3550; border-radius: 4px; background: #0f1829; }
+    #fv-toc.minis .toc-e.cur .mini { border-color: var(--cutebugs-blue, #4aa8ff); }
+    #fv-toc.minis .toc-e.cur .no { color: var(--cutebugs-blue, #4aa8ff); }
+    /* a miniature is a one-shot clone of the slide's live DOM — the deck's own
+       markup and CSS at its 1280 × 720 design size, scaled down to the entry */
+    #fv-toc .fv-stage { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; }
+    #fv-toc .fv-stage .reveal, #fv-toc .fv-stage .slides { position: absolute; inset: 0; width: 1280px; height: 720px; pointer-events: none; }
+    #fv-toc .fv-stage section { position: absolute !important; left: 0; top: 0; margin: 0; width: 1280px; height: 720px;
+                                visibility: visible; box-shadow: none; display: flex !important; }
     #fv-cap { flex: none; margin: 0 24px 12px; font-size: 17px; line-height: 1.45; background: var(--cutebugs-panel, #18233a);
               border-left: 6px solid var(--cutebugs-blue, #4aa8ff); padding: 12px 16px; }
     #fv-trace { flex: none; margin: 0 24px 18px; font: 13px/1.7 'IBM Plex Mono', monospace; color: var(--cutebugs-cyan, #8fc5fa); background: #0b1424;
@@ -82,7 +101,10 @@
       <div id="fv-cap"></div>
       <div id="fv-trace"><small>at this step</small><div id="fv-tracein">—</div></div>
     </div>
-    <aside id="fv-toc-wrap"><nav id="fv-toc" hidden></nav></aside>`;
+    <aside id="fv-toc-wrap">
+      <div id="fv-mode"><button data-m="list">titles</button><button data-m="minis">slides</button></div>
+      <nav id="fv-toc" hidden></nav>
+    </aside>`;
   document.body.append(view);
 
   const $ = (s) => view.querySelector(s);
@@ -158,10 +180,64 @@
     tocBuilt = true;
   }
 
+  // The overview lists the slides up to the furthest the deck has been (maxH):
+  // wherever the presenter went — or the follower walked — sets the frontier.
+  let maxH = 0;
+  let tocMode = 'list';
+  try { tocMode = localStorage.getItem('fv-toc-mode') || 'list'; } catch {}
+
+  function setMode(m) {
+    tocMode = m;
+    try { localStorage.setItem('fv-toc-mode', m); } catch {}
+    $('#fv-toc').classList.toggle('minis', m === 'minis');
+    [...$('#fv-mode').children].forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+    if (m === 'minis') {
+      for (let k = 0; k <= maxH; k++) ensureMini(k);
+      layoutMinis();
+    }
+  }
+  $('#fv-mode').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (b && b.dataset.m !== tocMode) setMode(b.dataset.m);
+  });
+
+  // A miniature: a clone of the slide's live DOM, fragments reset to their
+  // pristine state, scaled from the deck's 1280x720 design size. Built lazily,
+  // kept across renders.
+  function ensureMini(k) {
+    const e = $('#fv-toc').children[k];
+    if (!e || e.querySelector('.mini')) return;
+    const sl = Reveal.getHorizontalSlides()[k];
+    if (!sl) return;
+    const clone = sl.cloneNode(true);
+    clone.removeAttribute('style');
+    clone.removeAttribute('hidden');                     // reveal shows slides by clearing it
+    clone.removeAttribute('aria-hidden');
+    clone.classList.remove('present', 'past', 'future');
+    clone.querySelectorAll('.fragment').forEach((f) => f.classList.remove('visible', 'current-fragment', 'current-visible'));
+    const stage = document.createElement('div');
+    stage.className = 'fv-stage';
+    stage.innerHTML = '<div class="reveal"><div class="slides"></div></div>';
+    stage.querySelector('.slides').append(clone);
+    const mini = document.createElement('div');
+    mini.className = 'mini';
+    mini.append(stage);
+    e.append(mini);
+    e.title = e.querySelector('.tt').textContent;
+  }
+  function layoutMinis() {
+    $('#fv-toc').querySelectorAll('.mini').forEach((mini) => {
+      mini.querySelector('.fv-stage').style.transform = `scale(${mini.clientWidth / 1280})`;
+    });
+  }
+  window.addEventListener('resize', () => { if (tocMode === 'minis') layoutMinis(); });
+
   function render() {
     const sec = window.Reveal && Reveal.getCurrentSlide();
     const fol = sec && [...sec.children].find((e) => e.classList.contains('followers'));
     const i = Reveal.getIndices();
+    maxH = Math.max(maxH, i.h);
+    view.hidden = false;                                 // the view is unconditional now
     let step = 0, nSteps = 0;
     if (fol) {
       let b = built.get(fol);
@@ -172,22 +248,23 @@
       nSteps = b.nSteps;
       setStep(b, step);
     }
-    // The overview is on screen on every slide: slides up to now, the current
-    // one highlighted. In mirror mode the deck's own layout shrinks by the
-    // column's width so the slide stays clear of it.
-    if (!tocBuilt) buildToc();
+    // The overview is on screen on every slide, up to the furthest slide seen.
+    // In mirror mode the deck's own layout shrinks by the column's width so
+    // the slide stays clear of it.
+    if (!tocBuilt) { buildToc(); setMode(tocMode); }
     [...$('#fv-toc').children].forEach((e, k) => {
-      e.hidden = k > i.h;                                // only the slides up to now
+      e.hidden = k > maxH;                               // only the slides reached so far
       e.classList.toggle('cur', k === i.h);
+      if (tocMode === 'minis' && k <= maxH) ensureMini(k);   // a newly reached slide
     });
     $('#fv-toc').querySelector('.cur')?.scrollIntoView({ block: 'nearest' });
     const mirroring = !fol;
     if (document.body.classList.contains('fv-mirror') !== mirroring) {
       document.body.classList.toggle('fv-mirror', mirroring);
       Reveal.layout();                                   // re-scale into the reduced area
+      if (tocMode === 'minis') layoutMinis();
     }
     view.classList.toggle('mirror', mirroring);
-    view.hidden = false;
     window.parent.postMessage({ type: 'followers', active: !mirroring, step, nSteps, title: document.title }, '*');
   }
 
