@@ -104,7 +104,9 @@
     // it is then scaled up to span the full width, so no column of the window
     // goes to waste and the tiles still grow past MIN_TILE. A wider window
     // allows more columns at the floor scale, hence the cap on the search.
-    const M = 10;                                        // px kept clear of the window edges
+    // px kept clear of the window edges; a deck can ask for more room so the
+    // slides' box-shadow borders are not cut by the viewport (index.html)
+    const M = Number(document.body.dataset.overviewMargin) || 10;
     const strip = document.getElementById('keys');
     const availH = innerHeight - (strip && strip.offsetHeight ? strip.offsetHeight : 0);
     const Kfloor = Math.min(MIN_TILE / height, (innerWidth - 2 * M) / width);
