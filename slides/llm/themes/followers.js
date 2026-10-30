@@ -27,8 +27,18 @@
     .fv-com { color: var(--cutebugs-slate, #8e95a2); font-style: italic; } .fv-num { color: var(--cutebugs-orange, #f5a97f); }
     .fv-fn { color: var(--cutebugs-cyan, #8fc5fa); }
     #fv-side { border-left: 1px solid #2a3550; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: auto; }
-    #fv-status { font: 500 12px 'IBM Plex Mono', monospace; color: var(--cutebugs-slate, #8e95a2); }
-    #fv-status b { color: var(--cutebugs-cyan, #8fc5fa); font-weight: 500; }
+    /* where we are: every slide up to the current one, the current highlighted.
+       The list scrolls on its own; the caption and trace below keep their size. */
+    #fv-toc { flex: 1; min-height: 0; overflow: auto; font: 12.5px/1.9 'IBM Plex Sans', sans-serif; }
+    #fv-toc .toc-e { display: flex; gap: 10px; align-items: baseline; padding: 0 10px 0 8px; border-left: 3px solid transparent;
+                     color: var(--cutebugs-slate, #8e95a2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                     cursor: pointer; }
+    #fv-toc .toc-e:hover { color: var(--cutebugs-ink, #e3e9f3); }
+    #fv-toc .toc-e .no { font: 500 10px 'IBM Plex Mono', monospace; color: #4a5876; min-width: 2em; text-align: right; flex: none; }
+    #fv-toc .toc-e[hidden] { display: none; }
+    #fv-toc .toc-e.toc-title { font-family: 'IBM Plex Sans Condensed', sans-serif; font-weight: 600; }
+    #fv-toc .toc-e.cur { color: var(--cutebugs-ink, #e3e9f3); border-left-color: var(--cutebugs-blue, #4aa8ff);
+                         background: var(--cutebugs-panel, #18233a); }
     #fv-cap { font-size: 17px; line-height: 1.45; background: var(--cutebugs-panel, #18233a);
               border-left: 6px solid var(--cutebugs-blue, #4aa8ff); padding: 12px 16px; }
     #fv-trace { font: 13px/1.7 'IBM Plex Mono', monospace; color: var(--cutebugs-cyan, #8fc5fa); background: #0b1424;
@@ -46,6 +56,7 @@
       #fv-code { padding: 12px 0 12px 14px; }
       .fv-code { margin: 0 14px 0 0; font-size: 12px; }
       #fv-side { border-left: none; border-top: 1px solid #2a3550; padding: 10px 14px; gap: 8px; }
+      #fv-toc { flex: none; max-height: 30vh; }
       #fv-cap { font-size: 14px; padding: 10px 12px; }
       #fv-trace { font-size: 12px; padding: 8px 12px; }
     }
@@ -56,7 +67,7 @@
   view.hidden = true;
   view.innerHTML = `<div id="fv-code"></div>
     <aside id="fv-side">
-      <div id="fv-status">waiting for the presenter…</div>
+      <nav id="fv-toc" hidden></nav>
       <div id="fv-cap"></div>
       <div id="fv-trace"><small>at this step</small><div id="fv-tracein">—</div></div>
     </aside>`;
@@ -117,6 +128,24 @@
     if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
+  // The « where are we » list: every slide up to the current one, numbered and
+  // titled (title slides in the condensed face). Clicking an entry asks the
+  // follower page to display that slide; built once, updated per render.
+  let tocBuilt = false;
+  const slideTitle = (sl) => sl.querySelector('h1, h2')?.textContent.trim() || '—';
+  function buildToc() {
+    const toc = $('#fv-toc');
+    Reveal.getHorizontalSlides().forEach((sl, k) => {
+      const e = document.createElement('div');
+      e.className = 'toc-e' + (sl.classList.contains('title') ? ' toc-title' : '');
+      e.innerHTML = `<span class="no">${sl.dataset.n || k + 1}</span><span class="tt">${esc(slideTitle(sl))}</span>`;
+      e.addEventListener('click', () => window.parent.postMessage({ type: 'followers', select: k }, '*'));
+      toc.append(e);
+    });
+    toc.hidden = false;
+    tocBuilt = true;
+  }
+
   function render() {
     const sec = window.Reveal && Reveal.getCurrentSlide();
     const fol = sec && [...sec.children].find((e) => e.classList.contains('followers'));
@@ -132,11 +161,25 @@
     const i = Reveal.getIndices();
     const step = Math.min(Math.max((i.f === undefined ? -1 : i.f) + 1, 0), b.nSteps);
     setStep(b, step);
-    const title = sec.querySelector('h1')?.textContent || '';
-    $('#fv-status').innerHTML = `slide <b>${i.h + 1}</b> « ${esc(title)} »`;
+    if (!tocBuilt) buildToc();
+    [...$('#fv-toc').children].forEach((e, k) => {
+      e.hidden = k > i.h;                                // only the slides up to now
+      e.classList.toggle('cur', k === i.h);
+    });
+    $('#fv-toc').querySelector('.cur')?.scrollIntoView({ block: 'nearest' });
     view.hidden = false;
     window.parent.postMessage({ type: 'followers', active: true, step, nSteps: b.nSteps }, '*');
   }
+
+  // Navigation keys belong to the follower page: there they cross slides and
+  // steps, and the follower page owns the detached state. Keep them away from
+  // the mirrored deck's own reveal bindings, which would desync the chrome.
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    window.parent.postMessage({ type: 'followers', key: e.key === 'ArrowRight' ? 'next' : 'prev' }, '*');
+  }, true);
 
   const arm = () => {
     if (!window.Reveal) return setTimeout(arm, 100);     // deck.js initializes last

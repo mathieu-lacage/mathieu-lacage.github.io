@@ -137,16 +137,63 @@ function show(st) {
 
 function apply(st) { cur = st; show(st); }
 
+// Detached navigation walks the mirrored deck's own steps, across slides: the
+// step counts come from the deck itself (same origin). f = -1 — slide shown, no
+// step yet — participates in the walk like any step, so ← from a slide's first
+// step lands on the previous slide's last one.
+function stepsOf(h) {
+  try {
+    const sl = frame.contentWindow.Reveal.getHorizontalSlides()[h];
+    return sl ? sl.querySelectorAll('.fragment').length : 0;
+  } catch { return 0; }
+}
+function nSlides() {
+  try { return frame.contentWindow.Reveal.getHorizontalSlides().length; } catch { return 1; }
+}
+function stepNav(delta) {
+  if (!cur) return;
+  detach();
+  let { h, f } = cur;
+  f += delta;
+  while (f < -1) {                                     // backward past the first step
+    if (h <= 0) { f = -1; break; }
+    h--; f += stepsOf(h) + 1;
+  }
+  while (f >= stepsOf(h)) {                            // forward past the last step
+    if (h >= nSlides() - 1) { f = stepsOf(h) - 1; break; }
+    f -= stepsOf(h) + 1; h++;
+  }
+  apply({ ...cur, h, f });
+}
+
 // The embedded deck reports whether the current slide has followers content and
 // where its step stands — that is all the footer knows about the deck.
 window.addEventListener('message', (e) => {
   const m = e.data;
   if (!m || m.type !== 'followers') return;
+  if (m.select !== undefined) {                        // a past slide picked in the overview
+    if (cur) { detach(); apply({ ...cur, h: m.select, f: -1 }); }
+    window.focus();                                    // keys go back to this page
+    return;
+  }
+  if (m.key) {                                         // ←/→ pressed in the mirrored deck
+    stepNav(m.key === 'next' ? 1 : -1);
+    window.focus();
+    return;
+  }
   $('footer').hidden = !m.active;
   if (m.active) {
     nSteps = m.nSteps;
     $('#stepno').textContent = `step ${m.step} / ${m.nSteps}`;
   }
+});
+
+// ←/→ walk the deck's steps across slides (the mirrored deck forwards its own
+// keys here, so both focus cases end up on this path)
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  e.preventDefault();
+  stepNav(e.key === 'ArrowRight' ? 1 : -1);
 });
 
 // ------------------------------------------------------- detach and rejoin
@@ -164,8 +211,8 @@ $('#follow').onclick = $('#rejoin').onclick = () => {
   $('#rejoin').hidden = true;
   if (lastMsg) apply(lastMsg);
 };
-$('#prev').onclick = () => { detach(); if (cur) apply({ ...cur, f: Math.max(Math.min(cur.f - 1, nSteps - 1), -1) }); };
-$('#next').onclick = () => { detach(); if (cur) apply({ ...cur, f: Math.min(Math.max(cur.f + 1, -1), nSteps - 1) }); };
+$('#prev').onclick = () => stepNav(-1);
+$('#next').onclick = () => stepNav(1);
 
 // ------------------------------------------------------------------ the sync
 // The ntfy.sh topic is the password: the deck's « follow along » button (key L) picks
