@@ -105,17 +105,25 @@ function ensureFrame() {
   frame = document.createElement('iframe');
   frame.title = 'mirrored slide';
   frame.addEventListener('load', () => {                // the embedded deck's own keys strip is noise
-    try { frame.contentDocument.getElementById('keys')?.remove(); } catch {}
+    try {
+      frame.contentDocument.getElementById('keys')?.remove();
+      // a hash written while the document was still loading was lost: re-apply
+      // the newest pending state now that the frame has committed its URL
+      if (frame.dataset.frag) frame.contentWindow.location.hash = frame.dataset.frag;
+    } catch {}
   });
   $('#mirror').append(frame);
 }
 
 // Point the mirror at the state's deck URL and fragment. Same-origin fragments
 // are switched in place; anything else reloads the iframe (from the HTTP cache).
+// f is sent explicitly, -1 meaning « no step »: omitting the component would
+// leave whatever fragments the deck currently shows (reveal's readURL keeps
+// them), so the follower ran one step ahead after every step-back.
 function show(st) {
   $('#mirror').hidden = false;
   ensureFrame();
-  const frag = `#/${st.h}/${st.s}/${Math.max(st.f, 0)}`;
+  const frag = `#/${st.h}/${st.s}/${st.f >= 0 ? st.f : -1}`;
   if (frame.dataset.base !== st.url) {
     frame.dataset.base = st.url;
     frame.dataset.frag = frag;
@@ -156,8 +164,8 @@ $('#follow').onclick = $('#rejoin').onclick = () => {
   $('#rejoin').hidden = true;
   if (lastMsg) apply(lastMsg);
 };
-$('#prev').onclick = () => { detach(); if (cur) apply({ ...cur, f: Math.min(Math.max(cur.f, 0) - 1, nSteps - 1) }); };
-$('#next').onclick = () => { detach(); if (cur) apply({ ...cur, f: Math.min(Math.max(cur.f, 0) + 1, nSteps - 1) }); };
+$('#prev').onclick = () => { detach(); if (cur) apply({ ...cur, f: Math.max(Math.min(cur.f - 1, nSteps - 1), -1) }); };
+$('#next').onclick = () => { detach(); if (cur) apply({ ...cur, f: Math.min(Math.max(cur.f + 1, -1), nSteps - 1) }); };
 
 // ------------------------------------------------------------------ the sync
 // The ntfy.sh topic is the password: the deck's « follow along » button (key L) picks

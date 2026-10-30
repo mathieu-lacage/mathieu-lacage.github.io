@@ -93,18 +93,25 @@
       ).join('');
       box.append(label, out);
     });
+    // the slide's step count: the captions if authored, else the highest step
+    // any line belongs to (a code-only block has no .caps)
+    const hi = [...box.querySelectorAll('.fv-ln')].flatMap((ln) =>
+      (ln.dataset.s || '').split(/\s+/).filter(Boolean).map(Number));
     return {
       box,
       lines: [...box.querySelectorAll('.fv-ln')],
       caps: [...fol.querySelectorAll('.caps > p')].map((p) => p.innerHTML),
       trace: [...fol.querySelectorAll('.trace > p')].map((p) => p.innerHTML),
+      nSteps: Math.max([...fol.querySelectorAll('.caps > p')].length, hi.length ? Math.max(...hi) : 0),
     };
   }
 
   function setStep(b, step) {
     b.lines.forEach((ln) =>
       ln.classList.toggle('hl', step > 0 && (ln.dataset.s || '').split(' ').includes(String(step))));
-    $('#fv-cap').innerHTML = step === 0 ? 'press → in the deck…' : b.caps[step - 1] || '';
+    const cap = $('#fv-cap');
+    cap.innerHTML = step === 0 ? 'press → in the deck…' : b.caps[step - 1] || '';
+    cap.hidden = !cap.textContent.trim();                // code-only block: no captions
     $('#fv-tracein').innerHTML = step === 0 ? '—' : b.trace[step - 1] || '';
     const first = b.box.querySelector('.fv-ln.hl');
     if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -121,13 +128,14 @@
     let b = built.get(fol);
     if (!b) { b = build(fol); built.set(fol, b); }
     $('#fv-code').replaceChildren(b.box);
+    $('#fv-trace').hidden = b.trace.length === 0;        // code-only block: no trace panel
     const i = Reveal.getIndices();
-    const step = Math.min(Math.max((i.f === undefined ? -1 : i.f) + 1, 0), b.caps.length);
+    const step = Math.min(Math.max((i.f === undefined ? -1 : i.f) + 1, 0), b.nSteps);
     setStep(b, step);
     const title = sec.querySelector('h1')?.textContent || '';
     $('#fv-status').innerHTML = `slide <b>${i.h + 1}</b> « ${esc(title)} »`;
     view.hidden = false;
-    window.parent.postMessage({ type: 'followers', active: true, step, nSteps: b.caps.length }, '*');
+    window.parent.postMessage({ type: 'followers', active: true, step, nSteps: b.nSteps }, '*');
   }
 
   const arm = () => {

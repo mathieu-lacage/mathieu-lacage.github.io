@@ -39,7 +39,11 @@
     const t = window.syncTopic();
     if (!last || !t) return;
     last.t = Date.now();
-    fetch(`https://ntfy.sh/${t}`, { method: 'POST', body: JSON.stringify(last) }).catch(() => {});
+    // a failed POST (ntfy.sh rate-limits anonymous publishing) must not lose the
+    // state: retry the newest one shortly — the next step re-arms anyway
+    fetch(`https://ntfy.sh/${t}`, { method: 'POST', body: JSON.stringify(last) })
+      .then((r) => { if (!r.ok) throw new Error(r.status); })
+      .catch(() => { if (timer === null) timer = setTimeout(send, 2000); });
   }
 
   function publish() {
