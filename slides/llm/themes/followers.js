@@ -165,7 +165,7 @@
     b.lines.forEach((ln) =>
       ln.classList.toggle('hl', step > 0 && (ln.dataset.s || '').split(' ').includes(String(step))));
     const cap = $('#fv-cap');
-    cap.innerHTML = step === 0 ? 'press → in the deck…' : b.caps[step - 1] || '';
+    cap.innerHTML = step === 0 ? (b.nSteps ? 'press → in the deck…' : '') : b.caps[step - 1] || '';
     cap.hidden = !cap.textContent.trim();                // code-only block: no captions
     $('#fv-tracein').innerHTML = step === 0 ? '—' : b.trace[step - 1] || '';
     const first = b.box.querySelector('.fv-ln.hl');

@@ -392,6 +392,26 @@ Gate on top, the result h in the middle, Up at the bottom, all in the same colum
 column j of gate and column j of up give column j of h. The gate is drawn after SiLU,
 so the dark cells of h are exactly where the gate is closed.
 </aside>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The same
+     computation as the drawing, in code, one token at a time; the steps are the
+     viz's (gate and up, the elementwise product, down, the weights), lines carry
+     their line number (data-n) and the steps they belong to (data-s). -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1">def ffn(x, Wgate, Wup, Wdown):</span>
+<span class="ln" data-n="2">    """one row x of X: d = 2048 numbers in, d_ff = 6144 in the middle"""</span>
+<span class="ln" data-n="3" data-s="2">    g = x @ Wgate</span>
+<span class="ln" data-n="4" data-s="2">    u = x @ Wup</span>
+<span class="ln" data-n="5" data-s="3 4 5 6 7 8">    h = silu(g) * u   # gate times up, elementwise</span>
+<span class="ln" data-n="6" data-s="9 10 11 12 13">    y = x + h @ Wdown</span>
+<span class="ln" data-n="7">    return y</span>
+<span class="ln" data-n="8" data-s="14"># weights per layer: 2·d·d_ff (gate, up) + d_ff·d (down) = 37.7M</span>
+</code>
+</pre>
+</div>
 </section>
 
 <!-- ================================================================ -->
@@ -424,6 +444,26 @@ Row i of the output only reads row i of the input: no mask, no softmax over toke
 Without SiLU, W_up W_down would collapse into one d × d matrix: the nonlinearity is what
 makes 6 144 separate rules.
 </aside>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The
+     matrix form matching the right-hand column; the steps are the eqgrid's (one
+     per table row), lines carry their line number (data-n) and the steps they
+     belong to (data-s). -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1">def ffn(X, Wgate, Wup, Wdown):</span>
+<span class="ln" data-n="2">    """X: n rows, one per token"""</span>
+<span class="ln" data-n="3" data-s="1">    G = X @ Wgate</span>
+<span class="ln" data-n="4" data-s="2">    U = X @ Wup</span>
+<span class="ln" data-n="5" data-s="3">    H = silu(G) * U   # elementwise: n x d_ff</span>
+<span class="ln" data-n="6" data-s="4">    Y = X + H @ Wdown</span>
+<span class="ln" data-n="7">    return Y</span>
+<span class="ln" data-n="8" data-s="5"># without SiLU, Wup @ Wdown would collapse into one d x d matrix</span>
+</code>
+</pre>
+</div>
 </section>
 
 <!-- ================================================================ -->
@@ -448,6 +488,26 @@ Numbers: 3 × 2 048 × 6 144 = 37.7 M; attention 2 048 × (2 048 + 1 024 + 1 024
 = 12.6 M (8 KV heads). The FFN dominates weights and, for short contexts, FLOPs:
 attention's score and mix FLOPs grow with n, the FFN's do not.
 </aside>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The same
+     computation as the drawing, in code; the steps are the viz's (one product, the
+     row, H, down, the residual), lines carry their line number (data-n) and the
+     steps they belong to (data-s). -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1">def ffn(X, Wgate, Wup, Wdown):</span>
+<span class="ln" data-n="2">    """X: n rows of d numbers, one row per token"""</span>
+<span class="ln" data-n="3" data-s="1">    GU = X @ np.hstack([Wgate, Wup])   # one product: X · [Wgate | Wup]</span>
+<span class="ln" data-n="4" data-s="2">    G, U = GU[:, :d_ff], GU[:, d_ff:]</span>
+<span class="ln" data-n="5" data-s="3">    H = silu(G) * U                    # n x d_ff: 3x wider than X</span>
+<span class="ln" data-n="6" data-s="4">    Y = H @ Wdown                      # back to n x d</span>
+<span class="ln" data-n="7" data-s="5">    Y += X                             # the residual</span>
+<span class="ln" data-n="8" data-s="5">    return Y</span>
+</code>
+</pre>
+</div>
 </section>
 
 <!-- ================================================================ -->
@@ -682,6 +742,26 @@ one decode pass per token, each reading the cache and appending one k|v pair (go
 The layout of « Matrix version », same coordinates and colours, for the 4 prompt tokens:
 matrix × matrix products, n rows each. Then K and V are stored in the KV cache (top right).
 </aside>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The same
+     computation as the drawing, in code; the steps are the viz's, lines carry their
+     line number (data-n) and the steps they belong to (data-s). -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1"># prefill: the n prompt rows, all at once</span>
+<span class="ln" data-n="2" data-s="1">Q = x @ Wq</span>
+<span class="ln" data-n="3" data-s="1">K = x @ Wk</span>
+<span class="ln" data-n="4" data-s="2">S = Q @ K.T / np.sqrt(dh) + M</span>
+<span class="ln" data-n="5" data-s="2">A = softmax(S)</span>
+<span class="ln" data-n="6" data-s="3">V = x @ Wv</span>
+<span class="ln" data-n="7" data-s="3">Z = A @ V</span>
+<span class="ln" data-n="8" data-s="3">O = Z @ Wo</span>
+<span class="ln" data-n="9" data-s="4">cache.put(K, V)   # this block, this head</span>
+</code>
+</pre>
+</div>
 </section>
 
 <!-- ================================================================ -->
@@ -712,6 +792,31 @@ v5 are computed; the cached keys fly from the cache and turn into columns 1–4 
 cached values fly into rows 1–4 of V. At the end, k5ᵀ and v5 fly back into the cache.
 </aside>
 <script src="themes/prefill.js"></script>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The same
+     computation as the drawing, in code; the steps are the viz's (q, the new key
+     against the cached ones, the new value, the appends), lines carry their line
+     number (data-n) and the steps they belong to (data-s). -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1">def decode(x5, Wq, Wk, Wv, Wo, cache):</span>
+<span class="ln" data-n="2">    """x5: 1 x d, the new token; the cache holds K and V, n-1 rows"""</span>
+<span class="ln" data-n="3" data-s="1">    q = x5 @ Wq                    # one row</span>
+<span class="ln" data-n="4" data-s="2">    k = x5 @ Wk                    # only the new key</span>
+<span class="ln" data-n="5" data-s="3 4">    Kt = np.hstack([cache.K.T, k.T])   # cached keys: first columns</span>
+<span class="ln" data-n="6" data-s="5">    s = q @ Kt / np.sqrt(dh)       # 1 x n scores</span>
+<span class="ln" data-n="7" data-s="6">    a = softmax(s)</span>
+<span class="ln" data-n="8" data-s="7 8">    v = x5 @ Wv                    # only the new value</span>
+<span class="ln" data-n="9" data-s="9 10">    V = np.vstack([cache.V, v])        # cached values: first rows</span>
+<span class="ln" data-n="10" data-s="11">    z = a @ V                      # one row</span>
+<span class="ln" data-n="11" data-s="12">    o = z @ Wo                     # one row</span>
+<span class="ln" data-n="12" data-s="13 14">    cache.append(k, v)             # n + 1 rows next time</span>
+<span class="ln" data-n="13">    return o</span>
+</code>
+</pre>
+</div>
 </section>
 
 <!-- ================================================================ -->
@@ -800,6 +905,26 @@ A is a × b, B is b × c, C is a × c: the two b sides match.
 4. Read A and B from VRAM into the cache, once: 2(ab + bc) bytes (bf16: 2 bytes per number).
 5. Write C back to VRAM, once: 2ac bytes.
 </aside>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The same
+     count as the drawing, in code; the steps are the viz's (one cell, its FLOPs,
+     all cells, the reads, the write), lines carry their line number (data-n) and
+     the steps they belong to (data-s). -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1"># C = A @ B: A is a x b, B is b x c, C is a x c</span>
+<span class="ln" data-n="2" data-s="1">for i in range(a):</span>
+<span class="ln" data-n="3" data-s="1">    for j in range(c):</span>
+<span class="ln" data-n="4" data-s="1">        C[i, j] = A[i] @ B[:, j]   # row i of A, column j of B</span>
+<span class="ln" data-n="5" data-s="2">        # b multiplies + b adds: 2b FLOPs per cell</span>
+<span class="ln" data-n="6" data-s="3"># a*c cells: 2abc FLOPs</span>
+<span class="ln" data-n="7" data-s="4"># read A and B from VRAM, once: 2(ab + bc) bytes</span>
+<span class="ln" data-n="8" data-s="5"># write C back, once: 2ac bytes</span>
+</code>
+</pre>
+</div>
 </section>
 
 <!-- ================================================================ -->
@@ -840,6 +965,28 @@ number (square, sum, × 1/rms, × γ), residual 1.
 
 Llama-2-7B, n = 4 096: 62 TFLOPs, 13.2 GB of weights, 182 GB of activations.
 </aside>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The
+     table's rows as one static code listing (the slide has no steps): every
+     product of a block with the FLOPs of the matching row. -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1"># one block, n prompt tokens: every product with its cost</span>
+<span class="ln" data-n="2">Q = X @ Wq                       # 2nd·nh·dh FLOPs, 2d·nh·dh weights</span>
+<span class="ln" data-n="3">K, V = X @ Wk, X @ Wv            # twice Q</span>
+<span class="ln" data-n="4">S = Q @ K.T / np.sqrt(dh) + M    # 2nh·n²·dh: the only n² FLOPs</span>
+<span class="ln" data-n="5">A = softmax(S)                   # 5n²·nh</span>
+<span class="ln" data-n="6">Z = A @ V                        # 2nh·n²·dh</span>
+<span class="ln" data-n="7">O = Z @ Wo                       # 2n·nh·dh·d</span>
+<span class="ln" data-n="8">G, U = X @ Wgate, X @ Wup        # 2·2nd·dff FLOPs</span>
+<span class="ln" data-n="9">H = silu(G) * U                  # 5n·dff</span>
+<span class="ln" data-n="10">Y = X + H @ Wdown                # 2n·dff·d</span>
+<span class="ln" data-n="11"># norms and residuals: 10nd; every block, x L layers</span>
+</code>
+</pre>
+</div>
 </section>
 
 <!-- ================================================================ -->
@@ -992,6 +1139,28 @@ q · Kᵀ and a · V read the whole KV cache of the sequence, n · d_h numbers p
 K and V of the new token are written once into the cache. The unembedding W_U now runs at every
 step.
 </aside>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The
+     table's rows as one static code listing (the slide has no steps): the decode
+     of slide 28 with the FLOPs of the matching row. -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1"># one block, decode: 1 new row, the cache holds the context</span>
+<span class="ln" data-n="2">q = x5 @ Wq                      # 2·1·d·nh·dh FLOPs</span>
+<span class="ln" data-n="3">k, v = x5 @ Wk, x5 @ Wv          # twice q</span>
+<span class="ln" data-n="4">s = q @ cache.K.T / np.sqrt(dh)  # 2·nh·n·dh: the cache is read whole</span>
+<span class="ln" data-n="5">a = softmax(s)                   # 5·n·nh</span>
+<span class="ln" data-n="6">z = a @ cache.V                  # 2·nh·n·dh</span>
+<span class="ln" data-n="7">o = z @ Wo                       # 2·nh·dh·d</span>
+<span class="ln" data-n="8">G, U = x5 @ Wgate, x5 @ Wup      # 2·2·d·dff FLOPs</span>
+<span class="ln" data-n="9">H = silu(G) * U                  # 5·dff</span>
+<span class="ln" data-n="10">y = x5 + H @ Wdown               # 2·dff·d</span>
+<span class="ln" data-n="11"># norms and residuals: 10d; every block, x L layers, + W_U at every step</span>
+</code>
+</pre>
+</div>
 </section>
 
 <!-- ================================================================ -->

@@ -205,7 +205,7 @@ window.addEventListener('message', (e) => {
   $('footer').hidden = !m.active;
   if (m.active) {
     nSteps = m.nSteps;
-    $('#stepno').textContent = `step ${m.step} / ${m.nSteps}`;
+    $('#stepno').textContent = m.nSteps ? `step ${m.step} / ${m.nSteps}` : '—';
   }
 });
 
