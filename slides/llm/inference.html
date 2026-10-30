@@ -239,6 +239,35 @@ per-token sum did by stopping at n.
 <p><strong>Output</strong>: O = Z · W<sub>O</sub>, back to n × d</p>
 </div>
 <script src="themes/attention.js"></script>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The same
+     computation as the drawing, in code; the steps are the viz's (last row first,
+     then all rows at once), lines carry their line number (data-n) and the steps
+     they belong to (data-s). -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1">def attention(X, Wq, Wk, Wv, Wo):</span>
+<span class="ln" data-n="2">    """X: n rows of d numbers, one row per token"""</span>
+<span class="ln" data-n="3">    n, dh = X.shape[0], Wq.shape[1]</span>
+<span class="ln" data-n="4" data-s="1">    Q = X @ Wq</span>
+<span class="ln" data-n="5" data-s="2">    K = X @ Wk</span>
+<span class="ln" data-n="6" data-s="3">    Kt = K.T</span>
+<span class="ln" data-n="7">    s = np.zeros(n)</span>
+<span class="ln" data-n="8" data-s="4 5 6 7">    for j in range(n):</span>
+<span class="ln" data-n="9" data-s="4 5 6 7">        s[j] = Q[-1] @ Kt[:, j] / np.sqrt(dh)</span>
+<span class="ln" data-n="10" data-s="8">    a = softmax(s)</span>
+<span class="ln" data-n="11" data-s="9">    V = X @ Wv</span>
+<span class="ln" data-n="12" data-s="10">    z = a @ V</span>
+<span class="ln" data-n="13" data-s="11">    S = Q @ Kt / np.sqrt(dh)</span>
+<span class="ln" data-n="14" data-s="11">    S[np.triu_indices(n, 1)] = -np.inf</span>
+<span class="ln" data-n="15" data-s="11">    Z = softmax(S) @ V</span>
+<span class="ln" data-n="16" data-s="12">    O = Z @ Wo</span>
+<span class="ln" data-n="17" data-s="12">    return O</span>
+</code>
+</pre>
+</div>
 </section>
 
 <!-- ================================================================ -->
@@ -260,6 +289,34 @@ per-token sum did by stopping at n.
 <p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>: <strong>O</strong> = Σ<sub>h</sub> Z<sub>h</sub> · W<sub>O</sub><sup>(h)</sup> = Z · W<sub>O</sub>, n × d</p>
 </div>
 <script src="themes/heads.js"></script>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The same
+     computation as the drawing, in code; the steps are the viz's (one product,
+     slices, per-head attention, concat, the adds), lines carry their line number
+     (data-n) and the steps they belong to (data-s). -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1">def multihead(X, M, Wq, Wk, Wv, Wo, H=4):</span>
+<span class="ln" data-n="2">    """H heads side by side; d = H * dh"""</span>
+<span class="ln" data-n="3">    n, d = X.shape</span>
+<span class="ln" data-n="4" data-s="1">    Q, K, V = X @ Wq, X @ Wk, X @ Wv</span>
+<span class="ln" data-n="5" data-s="2">    Qh = np.split(Q, H, axis=1)</span>
+<span class="ln" data-n="6" data-s="2">    Kh = np.split(K, H, axis=1)</span>
+<span class="ln" data-n="7" data-s="2">    Vh = np.split(V, H, axis=1)</span>
+<span class="ln" data-n="8" data-s="3">    # head h owns Qh[h], Kh[h], Vh[h]: n x dh each</span>
+<span class="ln" data-n="9" data-s="4">    A = [softmax(Qh[h] @ Kh[h].T / np.sqrt(d // H) + M) for h in range(H)]</span>
+<span class="ln" data-n="10" data-s="5">    Zh = [A[h] @ Vh[h] for h in range(H)]</span>
+<span class="ln" data-n="11" data-s="6">    Z = np.hstack(Zh)</span>
+<span class="ln" data-n="12" data-s="7">    Wo_h = np.split(Wo, H, axis=0)</span>
+<span class="ln" data-n="13">    O = np.zeros((n, d))</span>
+<span class="ln" data-n="14" data-s="8 9 10 11">    for h in range(H):</span>
+<span class="ln" data-n="15" data-s="8 9 10 11">        O += Zh[h] @ Wo_h[h]</span>
+<span class="ln" data-n="16" data-s="11">    return O</span>
+</code>
+</pre>
+</div>
 </section>
 
 <!-- ================================================================ -->
