@@ -149,7 +149,7 @@
 
   /* ---------- S and A do not fit ---------- */
   const nofit = (svg) => {
-    const side = 400, x0 = 120, y0 = 160;
+    const side = 400, x0 = 440, y0 = 160;
     const GiB = 2 ** 30, area = (bytes) => side * Math.sqrt(bytes / GiB);
     el(svg, 'rect', { x: x0, y: y0, width: side, height: side, fill: '#3a2a44', stroke: C.magenta, 'stroke-width': 3 });
     el(svg, 'text', { x: x0 + side / 2, y: y0 + side / 2 - 10, fill: C.ink, 'font-size': 26, 'text-anchor': 'middle', 'font-weight': 600 }, 'S of one layer');
@@ -161,18 +161,6 @@
     el(svg, 'rect', { x: x0, y: y0 + side - l1, width: l1, height: l1, fill: C.green });
     el(svg, 'line', { x1: x0 + l1, y1: y0 + side - l1, x2: x0 + 60, y2: y0 + side + 40, stroke: C.green, 'stroke-width': 2 });
     el(svg, 'text', { x: x0 + 66, y: y0 + side + 46, fill: C.green, 'font-size': 18 }, 'L1 / shared of one SM: 128 KB');
-    const lines = [
-      ['Untiled attention writes S, reads it back for the softmax,', C.ink],
-      ['writes A, reads it back for A · V:', C.ink],
-      ['8 · n_h · n² bytes per layer through VRAM.', C.gold],
-      ['', C.ink],
-      ['n = 4 096: 4.3 GB per layer, 137 GB per prefill.', C.ink],
-      ['n = 32 k: one head\'s S alone is 2 GiB.', C.ink],
-      ['', C.ink],
-      ['The softmax does 5 FLOPs per 8 bytes:', C.slate],
-      ['memory bound, wherever the GEMMs are not.', C.slate],
-    ];
-    lines.forEach(([s, c], k) => sub(svg, { x: 600, y: 200 + k * 36, fill: c, 'font-size': 23 }, s));
   };
 
   /* ---------- FlashAttention-2: chained tiles ---------- */
@@ -191,14 +179,11 @@
     lab(qx + dh / 2, qy - 14, 'Q'); lab(kx + blk * bs / 2, ky - 14, 'Kᵀ'); lab(sx + blk * bs / 2, sy + blk * bs + 34, 'S, A: never stored', C.slate);
     lab(vx + dh / 2, qy - 14, 'V'); lab(ox + dh / 2, qy - 14, 'O');
     sub(svg, { x: qx - 14, y: qy + bs / 2 + 6, fill: C.slate, 'font-size': 18, 'text-anchor': 'end' }, 'B_r rows');
-    const state = el(svg, 'g');
-    const say = (t, attrs = {}) => sub(state, { x: 640, y: 560, fill: C.ink, 'font-size': 23, 'text-anchor': 'middle', ...attrs }, t);
     const gold = (r, opacity = 1) => { r.setAttribute('fill', C.gold); r.setAttribute('fill-opacity', opacity); };
     // block of rows i, phase ph: 0 Q_i alone · 1..blk tile j = ph − 1 · blk + 1 O_i written
     const draw = (i, ph) => {
       [...Q, ...K, ...V, ...O].forEach((r) => { r.setAttribute('fill', C.panel); r.setAttribute('fill-opacity', 1); });
       S.flat().forEach((r) => { r.setAttribute('fill', 'none'); r.setAttribute('stroke', C.dim); });
-      state.innerHTML = '';
       for (let k = 0; k < i; k++) gold(O[k]);
       if (ph <= blk) gold(Q[i]);
       if (ph >= 1 && ph <= blk) {
@@ -206,13 +191,10 @@
         gold(K[j]); gold(V[j]); gold(S[i][j]); S[i][j].setAttribute('stroke', C.gold);
         for (let k = 0; k < j; k++) S[i][k].setAttribute('stroke', C.slate);
         gold(O[i], 0.4);
-        say(`S_i_${j + 1} = Q_i · K_${j + 1}ᵀ, in SRAM;  update max m and sum ℓ;  O_i ← e^(m′−m) O_i + e^(S − m′) V_${j + 1}`, MATH);
-        el(state, 'text', { x: 640, y: 600, fill: C.slate, 'font-size': 20, 'text-anchor': 'middle' }, `K and V streamed tile by tile: tile ${ph} of ${blk}`);
       } else if (ph > blk) {
         gold(O[i]);
         S[i].forEach((r) => r.setAttribute('stroke', C.slate));
-        say(i === 0 ? 'O_i / ℓ, written once to VRAM.' : 'Next block of rows, same steps: another SM, in parallel.');
-      } else say('One block of B_r query rows Q_i, on one SM.');
+      }
     };
     let prev = null, timer;
     return (st) => {
