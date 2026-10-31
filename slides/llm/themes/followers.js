@@ -218,7 +218,8 @@
 
   // A miniature: a clone of the slide's live DOM, fragments reset to their
   // pristine state, scaled from the deck's 1280x720 design size. Built lazily,
-  // kept across renders.
+  // kept across renders. Scaled here on creation — render() adds minis for
+  // newly reached slides without re-running the full layout.
   function ensureMini(k) {
     const e = $('#fv-toc').children[k];
     if (!e || e.querySelector('.mini')) return;
@@ -239,10 +240,12 @@
     mini.append(stage);
     e.append(mini);
     e.title = e.querySelector('.tt').textContent;
+    stage.style.transform = `scale(${mini.clientWidth / 1280})`;
   }
   function layoutMinis() {
     $('#fv-toc').querySelectorAll('.mini').forEach((mini) => {
-      mini.querySelector('.fv-stage').style.transform = `scale(${mini.clientWidth / 1280})`;
+      if (mini.clientWidth > 0)                          // a hidden entry measures 0: keep its scale
+        mini.querySelector('.fv-stage').style.transform = `scale(${mini.clientWidth / 1280})`;
     });
   }
 
@@ -293,6 +296,7 @@
       e.classList.toggle('cur', k === i.h);
       if (tocMode === 'minis' && k <= maxH) ensureMini(k);   // a newly reached slide
     });
+    if (tocMode === 'minis') layoutMinis();              // minis may have appeared or the width drifted
     $('#fv-toc').querySelector('.cur')?.scrollIntoView({ block: 'nearest' });
     // Keep the deck's own layout in sync with the overlay's bands: the slide
     // must stay clear of the overview column and, on follower-content slides,
