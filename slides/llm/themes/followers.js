@@ -15,7 +15,9 @@
   if (/print-pdf/i.test(location.search)) return;
 
   document.head.insertAdjacentHTML('beforeend', `<style>
-    #followers-view { position: fixed; inset: 0; z-index: 50; display: grid; grid-template-columns: 1fr 400px;
+    /* --fv-col: the overview column's width; phones narrow it (media query below) */
+    :root { --fv-col: 400px; }
+    #followers-view { position: fixed; inset: 0; z-index: 50; display: grid; grid-template-columns: 1fr var(--fv-col);
                       min-height: 0; color: var(--cutebugs-ink, #e3e9f3);
                       font: 15px/1.5 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; }
     #followers-view[hidden] { display: none !important; }
@@ -30,8 +32,8 @@
        (its fragments step in sync with the code below): the top row is
        transparent, and the deck's own layout shrinks by the rendered heights
        of the bands (--fv-h content, --fv-t overview) so both fit exactly. */
-    body.fv-content .reveal { width: calc(100% - 400px); height: calc(100% - var(--fv-h, 0px)); }
-    body.fv-mirror .reveal { width: calc(100% - 400px); }
+    body.fv-content .reveal { width: calc(100% - var(--fv-col)); height: calc(100% - var(--fv-h, 0px)); }
+    body.fv-mirror .reveal { width: calc(100% - var(--fv-col)); }
     #fv-content { display: flex; flex-direction: column; min-height: 0; background: #05080e; }
     #fv-code { overflow: auto; flex: 1; min-height: 0; padding: 18px 0 18px 24px; }
     .fv-head { font: 600 11px 'IBM Plex Mono', monospace; letter-spacing: .12em; text-transform: uppercase;
@@ -82,21 +84,22 @@
                 border: 1px solid #2a3550; border-radius: 8px; padding: 10px 14px; }
     #fv-trace small { display: block; color: var(--cutebugs-slate, #8e95a2); font-size: 10px;
                       letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; }
-    /* phones (portrait or landscape): the code takes the whole width and every
-       pixel of left-over height, the caption and trace move below it (an auto
-       row: they get exactly what they need — a percentage max-height on the
-       item itself is mis-resolved against the auto row by Chrome). The follower
-       page sizes the iframe to the window, so these queries see the real
-       device size. */
+    /* phones (portrait or landscape) keep the overview on the right: the slide
+       is width-bound there, so a bottom band would crush it to a sliver — a
+       narrower column costs the slide almost nothing vertically. The column
+       holds the titles at a smaller face, the slide keeps every remaining
+       pixel. The follower page sizes the iframe to the window, so these
+       queries see the real device size. */
     @media (max-width: 820px), (max-height: 560px) {
-      #followers-view { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+      :root { --fv-col: 190px; }
       #fv-code { padding: 12px 0 12px 14px; }
-      .fv-code { margin: 0 14px 0 0; font-size: 12px; }
-      #fv-toc-wrap { border-left: none; border-top: 1px solid #2a3550; padding: 10px 14px; max-height: 30vh; }
-      body.fv-mirror .reveal { width: 100%; height: calc(100% - var(--fv-t, 0px)); }
-      body.fv-content .reveal { width: 100%; height: calc(100% - var(--fv-h, 0px) - var(--fv-t, 0px)); }
-      #fv-cap { margin: 0 14px 10px; font-size: 14px; padding: 10px 12px; }
-      #fv-trace { margin: 0 14px 12px; font-size: 12px; padding: 8px 12px; }
+      .fv-code { margin: 0 14px 0 0; font-size: 11px; }
+      #fv-toc-wrap { padding: 10px 12px; }
+      #fv-toc { font: 11px/1.8 'IBM Plex Sans', sans-serif; }
+      body.fv-mirror .reveal { width: calc(100% - var(--fv-col)); }
+      body.fv-content .reveal { width: calc(100% - var(--fv-col)); height: calc(100% - var(--fv-h, 0px)); }
+      #fv-cap { margin: 0 14px 10px; font-size: 13px; padding: 8px 12px; }
+      #fv-trace { margin: 0 14px 10px; font-size: 11px; padding: 6px 10px; }
     }
   </style>`);
 
@@ -258,7 +261,6 @@
       }
     };
     setVar('--fv-h', mirroring ? 0 : $('#fv-content').offsetHeight);
-    setVar('--fv-t', $('#fv-toc-wrap').offsetHeight);
     if (dirty && window.Reveal && Reveal.isReady()) {
       Reveal.layout();
       if (tocMode === 'minis') layoutMinis();

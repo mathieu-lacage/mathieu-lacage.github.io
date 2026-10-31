@@ -11,18 +11,17 @@
   document.head.insertAdjacentHTML('beforeend', `<style>
     [hidden] { display: none !important; }
     #syncqr { position: fixed; inset: 0; z-index: 99; background: #05080ecc; display: flex; align-items: center; justify-content: center; }
-    #syncqr .box { background: #0f1829; border: 1px solid #2a3550; border-radius: 12px; padding: 28px 34px; max-width: 420px;
-                   font: 15px/1.5 'IBM Plex Sans', sans-serif; color: var(--cutebugs-ink, #e3e9f3); }
-    #syncqr h2 { margin: 0 0 10px; font: 600 22px 'IBM Plex Sans Condensed', sans-serif; color: var(--cutebugs-blue, #4aa8ff); text-align: center; }
-    #syncqr p { margin: 8px 0; }
-    #syncqr .qr { display: block; background: #fff; border-radius: 8px; padding: 10px; width: min(220px, 60vw); margin: 10px auto;
-                  cursor: pointer; text-decoration: none; }
+    #syncqr .box { background: #0f1829; border: 1px solid #2a3550; border-radius: 12px; padding: 30px 40px 24px; max-width: 600px;
+                   font: 16px/1.5 'IBM Plex Sans', sans-serif; color: var(--cutebugs-ink, #e3e9f3); }
+    #syncqr h2 { margin: 0 0 14px; font: 600 30px 'IBM Plex Sans Condensed', sans-serif; color: var(--cutebugs-blue, #4aa8ff); text-align: center; }
+    #syncqr .qr { display: block; background: #fff; border-radius: 10px; padding: 14px; margin: 0 auto; cursor: pointer; text-decoration: none;
+                  /* min(…, 62vh): the square QR must fit a 720p projector with the title and the row below */
+                  width: min(420px, 62vh, 76vw); }
     #syncqr .qr svg { display: block; width: 100%; height: auto; }
     #syncqr .qr small { color: #05080e; }
-    #syncqr .row { display: flex; align-items: center; gap: 8px; }
-    #syncqr input { flex: 1; font: 500 15px 'IBM Plex Mono', monospace; color: #05080e; background: var(--cutebugs-ink, #e3e9f3);
-                    border: 1px solid #2a3550; border-radius: 6px; padding: 6px 10px; }
-    #syncqr .dice { font-size: 15px; padding: 6px 10px; border-radius: 6px; border: 1px solid #2a3550; background: none; color: inherit; cursor: pointer; }
+    #syncqr .row { display: flex; margin: 14px 0 0; }
+    #syncqr input { flex: 1; font: 500 17px 'IBM Plex Mono', monospace; color: #05080e; background: var(--cutebugs-ink, #e3e9f3);
+                    border: 1px solid #2a3550; border-radius: 6px; padding: 9px 12px; }
   </style>`);
 
   function showQR(suffix) {
@@ -53,19 +52,19 @@
         <div class="box">
           <h2>Follow along</h2>
           <a class="qr" target="_blank" title="open the follower view"></a>
-          <p class="row">channel <input spellcheck="false"> <button class="dice" title="new random string">↻</button></p>
+          <p class="row"><input spellcheck="false" placeholder="channel"></p>
         </div>`;
       document.body.append(modal);
       input = modal.querySelector('input');
       qrel = modal.querySelector('.qr');
       modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
-      modal.querySelector('.dice').addEventListener('click', () => { input.value = rand(); update(); });
       input.addEventListener('input', update);
       update();
     }
     modal.hidden = false;
     if (!input.value.trim()) input.value = (window.syncTopic() || '').split('-').pop() || rand();
     input.focus();
+    input.select();                                      // overwrite the channel right away
   }
   function update() {
     const s = input.value.trim() || rand();

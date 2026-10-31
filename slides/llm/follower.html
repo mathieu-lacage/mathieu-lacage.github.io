@@ -35,6 +35,10 @@
     color: var(--cutebugs-slate); background: none; border: 1px solid #2a3550;
   }
   .follow.is-on { color: #05080e; background: var(--cutebugs-blue); border-color: var(--cutebugs-blue); }
+  .fs { font: 600 14px/1 'IBM Plex Mono', monospace; width: 34px; height: 26px; border-radius: 6px;
+        border: 1px solid #2a3550; background: none; color: var(--cutebugs-ink); cursor: pointer; padding: 0; }
+  .fs:hover { border-color: var(--cutebugs-blue); }
+  .fs.is-on { color: #05080e; background: var(--cutebugs-blue); border-color: var(--cutebugs-blue); }
 
   main { flex: 1; min-height: 0; position: relative; }
 
@@ -61,6 +65,7 @@
     header { padding: 8px 12px; gap: 12px; }
     header .hd { font-size: 14px; }
     .follow { padding: 6px 12px; }
+    .fs { width: 40px; height: 36px; font-size: 16px; }
     footer { padding: 6px; gap: 10px; }
     footer button { width: 72px; height: 40px; }
     #stepno { font-size: 12px; min-width: 6em; }
@@ -75,6 +80,7 @@
   <div class="sync">
     <span class="live" id="live"><i></i>LIVE</span>
     <button class="follow is-on" id="follow">following</button>
+    <button class="fs" id="fs" title="full screen (f)" hidden></button>
   </div>
 </header>
 
@@ -234,6 +240,26 @@ $('#follow').onclick = $('#rejoin').onclick = () => {
 };
 $('#prev').onclick = () => stepNav(-1);
 $('#next').onclick = () => stepNav(1);
+
+// Full screen: the whole follower page, chrome included. Hidden where the API
+// is missing (iOS Safari only fullscreens video) — there the button is noise.
+const fsBtn = $('#fs');
+if (document.documentElement.requestFullscreen) {
+  fsBtn.hidden = false;
+  fsBtn.textContent = '⛶';
+  const toggleFS = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen();
+  };
+  fsBtn.onclick = toggleFS;
+  document.addEventListener('fullscreenchange', () => fsBtn.classList.toggle('is-on', !!document.fullscreenElement));
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey && !/input|textarea/i.test(e.target.tagName)) {
+      e.preventDefault();
+      toggleFS();
+    }
+  });
+}
 
 // ------------------------------------------------------------------ the sync
 // The ntfy.sh topic is the password: the deck's « follow along » button (key L) picks
