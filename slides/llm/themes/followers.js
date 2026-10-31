@@ -270,7 +270,16 @@
     }
   }
   document.fonts?.ready.then(syncBands);
-  window.addEventListener('resize', () => { syncBands(); if (tocMode === 'minis') layoutMinis(); });
+  // A phone rotating resizes this iframe, but mobile browsers often fail to
+  // deliver the window resize event to an iframe — watch the document's own box
+  // instead: it changes whenever the viewport, the bands or the column do.
+  const relayout = () => {
+    if (window.Reveal && Reveal.isReady()) Reveal.layout();    // the slide refits the new aspect
+    syncBands();
+    if (tocMode === 'minis') layoutMinis();
+  };
+  window.addEventListener('resize', relayout);
+  if (window.ResizeObserver) new ResizeObserver(relayout).observe(document.documentElement);
 
   function render() {
     const sec = window.Reveal && Reveal.getCurrentSlide();
