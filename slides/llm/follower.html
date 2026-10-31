@@ -148,6 +148,8 @@ let maxH = 0, maxF = -1;
 function present(st) {
   if (st.h > maxH || (st.h === maxH && st.f > maxF)) { maxH = st.h; maxF = st.f; }
   if (following) apply(st);
+  // detached, and the presenter just caught up with where we are: back in sync
+  else if (cur && cur.url === st.url && cur.h === st.h && cur.f === st.f) rejoin();
   postFrontier();
 }
 function postFrontier() {
@@ -223,13 +225,14 @@ function detach() {
   $('#follow').textContent = 'detached';
   $('#rejoin').hidden = false;
 }
-$('#follow').onclick = $('#rejoin').onclick = () => {
+function rejoin() {
   following = true;
   $('#follow').classList.add('is-on');
   $('#follow').textContent = 'following';
   $('#rejoin').hidden = true;
   if (lastMsg) apply(lastMsg);
-};
+}
+$('#follow').onclick = $('#rejoin').onclick = rejoin;
 $('#prev').onclick = () => stepNav(-1);
 $('#next').onclick = () => stepNav(1);
 
