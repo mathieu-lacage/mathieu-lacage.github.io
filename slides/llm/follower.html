@@ -54,9 +54,7 @@
   footer { flex: none; display: flex; align-items: center; justify-content: center; gap: 14px; padding: 8px; border-top: 1px solid #2a3550; background: #0f1829; }
   footer button { font: 600 16px/1 'IBM Plex Mono', monospace; width: 40px; height: 30px; border-radius: 6px; border: 1px solid #2a3550; background: none; color: var(--cutebugs-ink); cursor: pointer; }
   footer button:hover { border-color: var(--cutebugs-blue); }
-  #stepno { font: 500 13px 'IBM Plex Mono', monospace; color: var(--cutebugs-slate); min-width: 7em; text-align: center; }
-  #rejoin { position: fixed; right: 20px; bottom: 52px; }
-  #rejoin button { font: 500 12.5px 'IBM Plex Sans', sans-serif; padding: 6px 14px; border-radius: 14px; cursor: pointer; color: #05080e; background: var(--cutebugs-red); border: none; }
+  #rejoin { position: fixed; right: 20px; bottom: 52px; }  #rejoin button { font: 500 12.5px 'IBM Plex Sans', sans-serif; padding: 6px 14px; border-radius: 14px; cursor: pointer; color: #05080e; background: var(--cutebugs-red); border: none; }
   #demo { position: fixed; right: 16px; top: 60px; z-index: 9; background: #18233a; border: 1px solid #2a3550; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: var(--cutebugs-slate); }
   #demo button { display: block; width: 100%; margin: 4px 0; }
 
@@ -68,7 +66,6 @@
     .fs { width: 40px; height: 36px; font-size: 16px; }
     footer { padding: 6px; gap: 10px; }
     footer button { width: 72px; height: 40px; }
-    #stepno { font-size: 12px; min-width: 6em; }
     #rejoin { right: 12px; bottom: 58px; }
     #demo { right: 12px; left: 12px; top: 56px; }
   }
@@ -88,7 +85,6 @@
 
 <footer hidden>
   <button id="prev" title="previous step">‹</button>
-  <span id="stepno">step — </span>
   <button id="next" title="next step">›</button>
 </footer>
 <div id="rejoin" hidden><button>rejoin presenter</button></div>
@@ -104,7 +100,7 @@ const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
 const CH = params.get('ch') || localStorage.getItem('syncTopic') || '';
 
-let frame = null, lastMsg = null, following = true, nSteps = 0, cur = null;
+let frame = null, lastMsg = null, following = true, cur = null;
 
 function ensureFrame() {
   if (frame) return;
@@ -209,10 +205,6 @@ window.addEventListener('message', (e) => {
     return;
   }
   $('footer').hidden = !m.active;
-  if (m.active) {
-    nSteps = m.nSteps;
-    $('#stepno').textContent = m.nSteps ? `step ${m.step} / ${m.nSteps}` : '—';
-  }
 });
 
 // ←/→ walk the deck's steps across slides (the mirrored deck forwards its own
