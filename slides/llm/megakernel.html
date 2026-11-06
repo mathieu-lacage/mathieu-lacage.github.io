@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Megakernels</title>
+<link rel="stylesheet" href="vendor/reveal/reveal.css">
+<link rel="stylesheet" href="themes/cutebugs.css">
+<link rel="stylesheet" href="themes/megakernel.css">
+<script src="themes/steps.js"></script>
+</head>
+<body data-overview="sections">
+<!-- copied into every slide by themes/deck.js -->
+<footer id="footer" hidden>Megakernels — 2026-12 — <a href="mailto:mathieu.lacage@inria.fr">mathieu.lacage@inria.fr</a></footer>
+<div class="reveal">
+<div class="slides">
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>Megakernels</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>96 tasks on 96 SMs</h1>
+
+<div class="mk" data-mk="layer"></div>
+
+<aside class="notes" data-markdown>
+Qwen3-1.7B's gate + up projection at decode, batch 8, as Mirage's `demo/qwen3/demo.py` runs it on
+a B200: C (12288 × 8) = A (12288 × 2048) · B (2048 × 8). A = the gate and up weights side by side
+(2 × 6144 rows), B = the 8 tokens after the RMSNorm, C = the input of SiLU-mul. M is drawn 2.5 ×
+too short: to scale, a task would be a 7.5 px row.
+
+**Step 0.** A and C are cut in 96 blocks of 128 rows: one task each (`grid_dim = 96`, so each
+task's `OUTPUT_SIZE` is exactly one `MMA_M = 128` tile). B is not cut: every task reads all of it.
+
+**Step 1.** The B200 runs 128 workers, so all 96 tasks start at about the same time, each on its
+own SM. Each TMA warp issues its first 8 strips of A and B (faint blue): 96 SMEM rings fill at
+once; the first strips land and go to the tensor cores (gold).
+
+**Step 2 (auto-plays).** The 96 fronts sweep K together, each at its own pace (start offset, HBM
+contention). Each task streams its own 128 rows of A from HBM (512 KB; 50 MB for the layer, in
+bf16): that is what makes them memory-bound. All 96 read the whole of B, but B is only 32 KB and
+stays in L2. Each C block warms up as its TMEM accumulator fills, then turns solid gold when its
+epilogue stores it, without waiting for the other tasks. The layer is done when the slowest task is.
+
+Next slide: zoom into one task.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>One task: read from GMEM, MMA into TMEM</h1>
+
+<div class="mk" data-mk="ring"></div>
+
+<aside class="notes" data-markdown>
+Source: Mirage persistent kernel, `tasks/blackwell/linear_sm100_mpk.cuh`. Task 5 of Qwen3-1.7B's
+gate + up computes 128 output features: C (128 × 8) = A (128 × 2048) · B (2048 × 8), K cut into
+32 strips of 64.
+
+**Warp roles.** Warp 5 is the TMA producer, warp 4 the MMA issuer, warps 0–3 the epilogue.
+
+**The ring.** 8 SMEM slots (`NUM_AB_STAGE`), each holding A strip k (128 × 64, 16 KB) and B
+strip k (64 × 8). `smem_wr_buffer` and `smem_rd_buffer` are two cursors into the same ring,
+both equal to k % 8. Per slot, two mbarriers: `ab_full` (completed by the TMA's transaction
+bytes) and `ab_empty` (signalled by the MMA with `umma_arrive` once its 4 MMAs are done).
+
+**The MMAs.** 4 × `tcgen05.mma` per strip (`k_block` 0…3), each (128 × 16) · (16 × 8), read
+from SMEM in place through descriptors and added directly into the TMEM accumulator: 128 MMAs for
+the task. There is no per-strip partial: `ScaleOut::Zero` only on the very first MMA.
+
+**Memory-bound.** At decode batch sizes the MMA always waits on the next `ab_full`: 7 of the 8
+slots are in flight at any time, the faint blue window in A and B.
+
+**Next slide.** Once all 32 strips are in, C holds the finished 128 × 8 block in TMEM.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>One task: write back to GMEM</h1>
+
+<div class="mk" data-mk="epilogue"></div>
+
+<aside class="notes" data-markdown>
+Warps 0–3, the epilogue, take over once all 32 strips are in. C, as it ends the previous slide,
+is magnified on the right: the TMEM accumulator, 128 lanes × 16 columns (8 of them
+padding: the tensor core needs N a multiple of 16 at M = 128). Every buffer after it is drawn
+the same way, features × tokens.
+
+1. `acc_full`, then `tcgen05.ld`: warp w can only reach lanes 32w…32w+31, so each warp copies its
+   own band; thread t gets row t in `tTR_rAcc`, 16 fp32 registers (64 B). Then `acc_empty`: TMEM
+   is free.
+2. fp32 → bf16 into a second register tensor, `tCrC`: 16 bf16 per thread (32 B, packed two per
+   register). Gate + up has no bias or residual (the plain `linear_sm100` task).
+3. `st.shared`: thread t writes its row into the SMEM C stage, a 128 × 16 bf16 tile (4 KB).
+4. Fence + named barrier, then one thread of warp 0 issues the TMA store of the 8 real columns:
+   task 5's 128 rows of out. In memory out is token-major (8 × 12288), so the store writes 8
+   runs of 256 B, 24 576 B apart; the SMEM tile is already laid out for it (`sC` stride (128, 1)).
+
+One tile per task, so one of the 2 TMEM stages (`NUM_ACC_STAGE`) and one of the 4 SMEM C stages
+(`NUM_C_STAGE`) are used. They matter for multi-tile tasks: the LM head runs 10 tiles per task,
+the MMA filling one TMEM stage while the epilogue drains the other, and up to 3 TMA stores in
+flight while the next tile is written to SMEM.
+</aside>
+<script src="themes/megakernel.js"></script>
+</section>
+
+</div>
+</div>
+
+<script src="vendor/reveal/reveal.js"></script>
+<script src="vendor/reveal/notes.js"></script>
+<script src="themes/deck.js"></script>
+<!-- followers follow on their laptops: press L to pick the channel + QR (themes/sync-qr.js) -->
+<script src="themes/sync.js" data-topic-base="inria-llm" data-follower="follower.html"></script>
+<script src="themes/sync-qr.js"></script>
+<script src="themes/followers.js"></script>
+</body>
+</html>
