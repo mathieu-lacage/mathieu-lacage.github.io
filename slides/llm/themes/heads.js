@@ -15,7 +15,8 @@
 //   data-kv      the number of key / value heads, a divisor of H (H: multi-head attention).
 //                With fewer (grouped-query attention), W_K and W_V have only data-kv column
 //                slices; each column holds a group of H / data-kv query heads, which share
-//                its K and V: one row A_h, Z_h per query head, Z_h under the shared V
+//                its K and V: one row A_h, Z_h per query head, Z_h under the shared V (two per
+//                row when a group holds more than 2 query heads, e.g. data-kv="1")
 //   data-unit    pixels per unit: n = N, d_h = 2 and d = H · d_h units (18)
 // Its <p> children are the captions, one per step, in order.
 // Positions are slide coordinates (the root sits at 72, 150), as in attention.js; its
@@ -50,9 +51,11 @@
     const u = +(root.dataset.unit || 18), n = N * u, dh = 2 * u, d = H * dh, dk = KV * dh, g = 10, sg = 6;
     const XX = 80, YW = 160, YP = YW + d + g, YA = YP + n + 16;
     const ya = (r) => YA + r * (n + 16);                 // row of the r-th query head of a column
+    // more than 2 query heads per column (multi-query attention): 2 per row, or they run off the slide
+    const LN = R > 2 ? 2 : 1, RW = Math.ceil(R / LN);    // lanes, rows per column
     const W = [d, dk, dk];                               // widths of W_Q, W_K, W_V
     const fx = (m, k) => 250 + (m > 0) * (d + g) + (m > 1) * (dk + g) + k * dh;  // slice k of W_m, side by side (one product)
-    const CW = (R + 2) * dh + (R + 1) * sg;              // a column: R query slices, then K and V
+    const CW = (R + 2) * dh + (R + 1) * sg + (LN - 1) * (dh + sg);  // R query slices, K and V, room for the 2nd lane of Z
     const hx = (j) => 250 + j * (CW + 36);               // column j, of key / value head j
     const slot = (m, k) => (m ? R - 1 + m : k % R);      // slice k of W_m, its place in its column
     const sx = (m, k) => hx(m ? k : Math.floor(k / R)) + slot(m, k) * (dh + sg);  // slice k of W_m, regrouped
@@ -78,7 +81,7 @@
     const els = [], moves = [];                         // moves: [element, step, dx, dy]
 
     // column panels, behind everything
-    groups.forEach((j) => els.push(box('hd-panel', hx(j) - 12, YW - 12, CW + 24, ya(R - 1) + n - YW + 24,
+    groups.forEach((j) => els.push(box('hd-panel', hx(j) - 12, YW - 12, CW + 24, ya(RW - 1) + n - YW + 24,
       { vis: [from(REG)], hl: [one(REG)] }, h('span', 'hd-ht',
         { html: R === 1 ? `head ${j + 1}` : `heads ${Array.from({ length: R }, (_, r) => j * R + r + 1).join(', ')}` }))));
     // x, and a faint rail: the same x feeds every head
@@ -112,18 +115,19 @@
 
     // per head, on its row of its column: A_h under Q_h and K, Z_h under V
     heads.forEach((k) => {
-      const P = pattern(k, N), cells = [], j0 = Math.floor(k / R), r = k % R;
+      const P = pattern(k, N), cells = [], j0 = Math.floor(k / R), rr = Math.floor((k % R) / LN), cc = k % LN;
       P.forEach((row, i) => P.forEach((_, j) => {
         const pos = `left:${j * u}px; top:${i * u}px; width:${u - 2}px; height:${u - 2}px;`;
         cells.push(j > i ? h('div', 'at-cell at-mask', { style: pos })
           : h('div', 'at-cell', { style: `${pos} background:rgba(143,197,250,${(0.15 + 0.85 * row[j]).toFixed(2)})` }));
       }));
-      els.push(box('at-box', hx(j0) + ((R + 1) * dh + R * sg - n) / 2, ya(r), n - 2, n - 2, { vis: [from(ATT)], hl: [one(ATT)] },
+      const ax = hx(j0) + ((R + 1) * dh + R * sg - LN * n - (LN - 1) * 16) / 2 + cc * (n + 16);  // centred under the Q and K slices
+      els.push(box('at-box', ax, ya(rr), n - 2, n - 2, { vis: [from(ATT)], hl: [one(ATT)] },
         ...cells, name(`A<sub>${k + 1}</sub>`, { cls: 'hd-sm' })));
-      const z = act(sx(2, j0), ya(r), dh, COL.z, `Z<sub>${k + 1}</sub>`,
+      const z = act(sx(2, j0) + cc * (dh + sg), ya(rr), dh, COL.z, `Z<sub>${k + 1}</sub>`,
         { vis: [from(ZS)], hl: [one(ZS), one(SUM[k])], nm: { cls: 'hd-sm' } });
       els.push(z);
-      moves.push([z, CAT, ZX + k * dh - sx(2, j0), YA - ya(r)]);
+      moves.push([z, CAT, ZX + k * dh - sx(2, j0) - cc * (dh + sg), YA - ya(rr)]);
     });
     els.push(box('at-box hd-name', ZX, YA, d, n, { vis: [from(CAT)], hl: [one(CAT)] }),
       box('hd-name', ZX, YA - 30, d, 26, { vis: [from(CAT)] }, name('Z', { cls: 'hd-sm' })),
