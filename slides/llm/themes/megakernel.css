@@ -9,3 +9,27 @@
 .mk svg .nm { font-size: 22px; font-weight: 600; text-anchor: middle; dominant-baseline: central;
   paint-order: stroke; stroke: #0f1829; stroke-width: 5px; stroke-linejoin: round; }
 .mk svg .bl { font-size: 20px; font-style: italic; fill: var(--cutebugs-cyan); }
+
+/* « Paged attention » (themes/paged.js, on top of themes/prefill.css): blocks gathered from the pages */
+.pd .pa-fly { transform-box: view-box; animation: pa-fly 1s cubic-bezier(.5, 0, .3, 1) both; }
+@keyframes pa-fly {
+  0% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(var(--sx), var(--sy)); opacity: 1; }
+  92% { transform: none; opacity: 1; }
+  100% { transform: none; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .pd .pa-fly { display: none; } }
+
+/* the attention tasks (themes/attn-tasks.js): caption under the figure, small labels */
+.gq-cap { position: absolute; left: 90px; right: 90px; bottom: 76px; font-size: 20px; line-height: 1.35;
+  color: var(--cutebugs-ink); min-height: 2.7em; }
+.gq-cap b { color: var(--cutebugs-cyan); font-weight: 600; }
+.mk svg .gn { font-size: 15px; font-weight: 600; fill: #e3e9f3; text-anchor: middle; dominant-baseline: central;
+  paint-order: stroke; stroke: #0f1829; stroke-width: 3px; }
+.mk svg .gl { font-size: 13px; fill: #8e95a2; }
+.mk svg .gh { font-size: 13px; fill: #8e95a2; font-weight: 600; letter-spacing: .06em; }
+.mk svg .ap { animation: gq-ap .5s ease both; }
+@keyframes gq-ap { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .mk svg .ap { animation: none; } }
+
+/* « Softmax: textbook vs online » (themes/softmax.js): the numbers in the cells */
+.mk svg .num { font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; }
