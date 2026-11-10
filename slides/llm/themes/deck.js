@@ -195,6 +195,9 @@
   Reveal.on('overviewshown', () => { vscroll = 0; });    // each open starts at the top
   Reveal.on('slidechanged', regrid);
   window.addEventListener('resize', regrid);
+  // reveal.js re-lays out on its own on window load (late on a slow network: the
+  // web fonts), which puts its single-row overview back: grid again after it
+  window.addEventListener('load', regrid);
   window.addEventListener('wheel', (e) => {              // the overview's vertical scroll
     if (!Reveal.isOverview() || !view.max) return;
     e.preventDefault();
