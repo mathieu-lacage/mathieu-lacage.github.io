@@ -1,0 +1,22 @@
+/* Normalization slides (themes/norm.js): the figure is an SVG in slide coordinates on a layer
+   over the whole slide; the caption box sits above the footer, as in themes/ffn.css. */
+.norm { position: absolute; inset: 0; pointer-events: none; }
+.norm-body { position: absolute; inset: 0; }
+.norm-body > svg { position: absolute; left: 0; top: 0; overflow: visible; }
+.norm svg text { font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; letter-spacing: normal; fill: var(--cutebugs-ink); }
+.norm-caps { position: absolute; left: 72px; right: 72px; top: 584px; display: grid; }
+.norm-caps > p {
+  grid-area: 1 / 1; margin: 0 !important; min-height: 58px; font-size: 23px; line-height: 1.3; box-sizing: border-box;
+  background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-cyan); padding: 12px 22px;
+}
+.norm-caps > p.is-off { visibility: hidden; }
+
+/* steps: hidden elements; animations replayed on entering their step (class play) */
+.norm [data-s], .norm [data-e] { transition: opacity .35s; }
+.norm .off { opacity: 0 !important; }
+.norm .hop { opacity: 0; }
+.norm .play.hop { animation: norm-hop var(--dur) var(--delay, 0s) steps(var(--n), end); }
+.norm .play .pop, .norm .play.pop { animation: norm-pop .18s var(--delay, 0s) both; }
+@keyframes norm-hop { from { opacity: 1; transform: translateX(0); } to { opacity: 1; transform: translateX(var(--w)); } }
+@keyframes norm-pop { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .norm .play.hop, .norm .play .pop, .norm .play.pop { animation: none; } }

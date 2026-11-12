@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="themes/cutebugs.css">
 <link rel="stylesheet" href="themes/decoding.css">
 <link rel="stylesheet" href="themes/ffn.css">
+<link rel="stylesheet" href="themes/norm.css">
 <script>
 window.MathJax = {
   tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
@@ -203,9 +204,144 @@ Qwen3 MoE: softmax over all experts, keep the top k, then renormalize the kept o
 <h1>Normalization</h1>
 </section>
 
+<!-- ================================================================ -->
+<section>
+<h1>Pre-norm, post-norm</h1>
+
+<div class="norm" data-norm="prepost">
+<p>The same block twice: the only difference is <strong>where the norm sits</strong></p>
+<p>Pre-norm: the norm sits <strong>inside the branch</strong>, just before attention</p>
+<p>The residual stream goes <strong>straight through</strong>: attention is added back, never normalized</p>
+<p>Same for the FFN: a normalized copy goes in, its output is added back</p>
+<p>Post-norm: the norm sits <strong>on the stream</strong>, after the add: LayerNorm(x + Attn(x))</p>
+<p>The normalized stream feeds the FFN, its output is added, <strong>normalized again</strong> — every layer</p>
+<p>Pre-norm leaves the skips untouched: <strong>gradients flow</strong>, no warm-up — every modern model</p>
+<p>The price: the stream is never normalized, so one <strong>last norm</strong> before the unembedding</p>
+</div>
+
+<aside class="notes" data-markdown>
+Pre-norm (2019–): the norms live inside the branches, the residual stream is never
+touched. GPT-2 moved the norm there; Llama, Qwen3, everything modern is pre-norm.
+Post-norm: the norm sits on the stream after each add — the original Transformer
+(Vaswani 2017) and BERT.
+
+Why pre-norm won: Xiong et al. 2020, « On Layer Normalization in the Transformer
+Architecture » — in post-norm, the gradient of every layer passes through a norm, which
+shrinks it and requires a learning-rate warm-up; pre-norm trains without one. Nguyen &
+Salazar 2019 say it first.
+
+The price of pre-norm: the stream comes out unnormalized, so one final norm is needed
+before the unembedding (Qwen3 config: model.norm). Post-norm needs none.
+
+Optional 4th slide if asked: sandwich norm (Gemma 2/3, OLMo 2) — pre-norm plus an extra
+norm after the sub-layer, inside the branch.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>LayerNorm → RMSNorm</h1>
+
+<div class="norm" data-norm="rms">
+<p>« Paris » enters the norm: its vector <strong>x</strong>, d = 8 numbers. Two norms, same job</p>
+<p>LayerNorm: <strong>subtract the mean</strong> μ = 0.5 — the vector is centered</p>
+<p>Divide by the <strong>standard deviation</strong> σ = 1.5: unit variance, values within ±1.67</p>
+<p><strong>Scale by γ</strong>, one learned number per coordinate, and <strong>add β</strong></p>
+<p>RMSNorm drops the mean and β: divide by the <strong>root mean square</strong>, RMS = √2.5 ≈ 1.58</p>
+<p>y = γ ⊙ x / RMS — <strong>the same job, fewer ops</strong>: no μ, no β</p>
+<p>Qwen3-1.7B: <strong>RMSNorm</strong>, ε = 1e-6 — two per layer + a final one, γ of d = 2 048</p>
+</div>
+
+<aside class="notes" data-markdown>
+LayerNorm: Ba, Kiros, Hinton 2016. RMSNorm: Zhang & Sennrich 2019 — drop mean-centering
+and the bias, keep only the rescaling.
+
+The worked x = [1, 2, −1, 0, 3, −2, 1, 0]: mean 0.5, mean of squares 2.5, so σ = √(2.5 − 0.25)
+= 1.5 and RMS = √2.5 ≈ 1.58. ε guards the division (Qwen3: rms_norm_eps = 1e-6, negligible
+at d = 2048). In practice ε is inside the √ with the variance or the mean of squares.
+
+Qwen3-1.7B: two RMSNorms per layer (input_layernorm, post_attention_layernorm) plus the
+final model.norm — each a single γ of d = 2 048, ≈ 2 048 weights per norm.
+
+Cost: these norms are element-wise work, counted in the cost tables' 10 n d per layer
+(« softmax, SiLU, norms »): ≈ 5 ops per number per norm, × 2 norms. LayerNorm would add
+the mean subtraction and the β — RMSNorm is also a small win there.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>QK-norm</h1>
+
+<div class="norm" data-norm="qk">
+<p>Back in the attention layer: one head's <strong>q, k, v</strong> — slices of x · W<sub>Q</sub>, x · W<sub>K</sub>, x · W<sub>V</sub></p>
+<p>Qwen3 passes <strong>q and k through an RMSNorm</strong> before using them; v goes untouched</p>
+<p>One norm per head: d<sub>h</sub> numbers, its own <strong>γ of d<sub>h</sub></strong> — 16 query heads, 8 KV heads</p>
+<p>Then RoPE (the Position section), then the usual <strong>A = softmax(q k<sup>T</sup> / √d<sub>h</sub> + M)</strong></p>
+<p>Why: q and k meet in a dot product — the norm keeps their <strong>logits bounded</strong></p>
+<p>Qwen2: a learned <strong>bias on q, k, v</strong>. Qwen3: biases dropped, these two norms instead</p>
+</div>
+
+<aside class="notes" data-markdown>
+Qwen3-1.7B: q_norm and k_norm, an RMSNorm over head_dim = 128 applied to each head's q
+and k right after the projection, before RoPE (tools/qkv_map.py:
+`at.q_norm(at.q_proj(x).view(T, nH, dh))`). Each owns a γ of d_h = 128; the 16 query
+heads' q_norms and the 8 KV heads' k_norms are separate.
+
+Qwen2 had a bias on Q, K, V instead (Qwen2 config: qkv bias) — also a stability hack.
+Qwen3 dropped the biases and added q_norm/k_norm (Qwen2 had no q/k norm). Precedent for
+QK-norm at scale: ViT-22B (Dehghani et al. 2023).
+
+Effect: q and k enter the logits through their dot product; with unnormalized q, k a few
+heads grow large norms and their logits blow up. The visible symptom is the attention
+sink (« is a BOS token a sink? » in inference.html, data/trace-Qwen3-1.7B-sink.json).
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Sandwich norm</h1>
+
+<div class="norm" data-norm="sandwich">
+<p>Pre-norm recap: <strong>x + Attn(Norm(x))</strong> — the stream itself is never normalized</p>
+<p>Sandwich norm: a <strong>second norm inside the branch</strong> — x + Norm(Attn(Norm(x)))</p>
+<p>Why: the stream grows <strong>without bound</strong> — measured, × 2 500 across Qwen3's 28 layers</p>
+<p>Every add is now a <strong>normalized vector</strong>: no sub-layer can blow up the stream</p>
+<p>Qwen3's fix is <strong>one-off at the end</strong> (3296 → 110); the sandwich norm bounds <strong>every layer</strong></p>
+<p>Gemma 2 / 3 and OLMo 2 train this way; Qwen3 keeps plain pre-norm + QK-norm</p>
+</div>
+
+<aside class="notes" data-markdown>
+Sandwich norm: an extra norm on the branch output, before the add — pre-norm and
+post-norm in the same sub-layer. Gemma 2/3 (RMSNorm before AND after each sub-layer)
+and OLMo 2 (their « Post-Norm » placement: x + Norm(attn(norm(x)))).
+
+Why it might be needed: in plain pre-norm, nothing ever normalizes the stream — our own
+Qwen3-1.7B trace (data/Qwen3-1.7B.json, residual_norm) shows ‖x « Paris »‖ growing
+1.3 → 3296 over the 28 layers (× 2 500), then the final norm pulling it to 110. Each
+sub-layer's output is added to the stream with whatever norm it happens to have; a few
+coordinates grow huge (the massive activations tied to attention sinks). The sandwich
+norm makes every contribution a normalized vector: growth per layer is bounded by
+construction, no single branch can push the stream around, and late layers see sane
+inputs. OLMo 2 reports it trains more stably; Gemma 2 pairs it with logit soft-capping
+for stability at scale.
+
+Cost: one extra element-wise norm per sub-layer — ≈ 5 n d ops and a γ of d — noise next
+to the 2 n d² matmuls. The final norm still stays (Gemma and OLMo 2 keep one).
+
+Qwen3 does NOT use a sandwich norm: its stability tools are QK-norm (previous slide);
+the stream is left free to grow and only rescaled once, by model.norm, before the
+unembedding. Trade-off to discuss: sandwich norm bounds growth layer by layer; the
+final norm is free but the unnormalized stream is what attention and the FFN consume —
+which is exactly why each sub-layer starts with an input norm.
+</aside>
+</section>
+
+
 </div>
 </div>
 
+<script src="themes/norm.js"></script>
 <script src="vendor/reveal/reveal.js"></script>
 <script src="vendor/reveal/notes.js"></script>
 <script src="themes/deck.js"></script>
