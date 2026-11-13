@@ -33,3 +33,21 @@
 
 /* « Softmax: textbook vs online » (themes/softmax.js): the numbers in the cells */
 .mk svg .num { font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; }
+
+/* « RMSNorm Layer » (themes/rmsnorm.js): the one-task slide's caption, a bit higher and smaller than
+   .gq-cap — the figure runs down to y ≈ 560 */
+.rn-cap { position: absolute; left: 90px; right: 90px; bottom: 92px; font-size: 19px; line-height: 1.35;
+  color: var(--cutebugs-ink); min-height: 2.7em; }
+.rn-cap b { color: var(--cutebugs-cyan); font-weight: 600; }
+.rn-cap code { font-size: 17px; }
+
+/* section « The setup »: key/value tables */
+.mkp-tbl { position: absolute; left: 90px; top: 200px; border-collapse: collapse; font-size: 15px; line-height: 1.25; }
+.mkp-tbl th { text-align: left; font-weight: 600; color: var(--cutebugs-cyan); padding: 2px 14px 4px 0;
+  border-bottom: 1px solid #3d4a63; }
+.mkp-tbl td { padding: 2px 14px 2px 0; white-space: nowrap; }
+.mkp-tbl td.n { text-align: right; font-variant-numeric: tabular-nums; }
+.mkp-tbl code { font-size: 13px; }
+.mkp-tbl tr.sum td { border-top: 1px solid #3d4a63; font-weight: 600; }
+.mkp-tbl tr.sep td { padding-top: 8px; color: #8e95a2; font-style: italic; }
+.mkp-tbl i.sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }

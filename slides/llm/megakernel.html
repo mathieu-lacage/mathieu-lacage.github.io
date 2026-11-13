@@ -23,6 +23,86 @@
 
 <!-- ================================================================ -->
 <section class="title">
+<h1>The setup</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>The model: Qwen3-1.7B</h1>
+
+<table class="mkp-tbl mkp-kv" style="top: 150px">
+<tr><th colspan="2">config.json</th></tr>
+<tr><td>layers</td><td>28</td></tr>
+<tr><td>hidden size <i>d</i></td><td>2048</td></tr>
+<tr><td>attention</td><td>16 Q heads, 8 KV heads (GQA 2:1)</td></tr>
+<tr><td>head dim</td><td>128, with QK-norm, RoPE θ = 10⁶</td></tr>
+<tr><td>MLP</td><td>SwiGLU, intermediate 6144</td></tr>
+<tr><td>vocabulary</td><td>151 936, embedding = LM head (tied)</td></tr>
+<tr><td>dtype</td><td>bf16</td></tr>
+<tr><th colspan="2" style="padding-top: 14px">what it weighs</th></tr>
+<tr><td>one layer</td><td>50.3 M params = 101 MB</td></tr>
+<tr><td>28 layers</td><td>1.41 B params = 2.82 GB</td></tr>
+<tr><td>embedding / LM head</td><td>311 M params = 622 MB</td></tr>
+<tr class="sum"><td>total</td><td>1.72 B params = 3.44 GB</td></tr>
+<tr><td>KV cache</td><td>28 × 2 × 8 × 128 × 2 B = 112 KB / token</td></tr>
+<tr><th colspan="2" style="padding-top: 14px">run (demo flags)</th></tr>
+<tr><td>batch</td><td>4 requests decoding, 1 token each: 4 token slots per iteration</td></tr>
+</table>
+
+<div class="mk" data-mkp="model"></div>
+
+<aside class="notes" data-markdown>
+Source: `Qwen/Qwen3-1.7B` `config.json`; the run is `demo/qwen3/demo.py` with
+`--max-num-batched-requests 4 --max-num-batched-tokens 4` (the demo's defaults are 1 request and 8
+tokens). 4 requests rather than 8 so that requests (4), KV heads (8) and Q heads (16) are different
+numbers on every slide.
+
+Per layer: q 2048 × 2048, k and v 1024 × 2048 each, o 2048 × 2048 (12.6 M); gate, up 6144 × 2048,
+down 2048 × 6144 (37.7 M). The norms are negligible (4 vectors of 2048 or 128).
+
+The right side is one layer in the order MPK runs it, coloured as the tasks of the next section:
+the weight matrices it streams, with their bf16 size. A decode step reads every byte of them once:
+2.82 GB for the layers + 622 MB for the LM head (the embedding lookup only reads 4 rows of the same
+matrix), plus the KV cache of each request.
+
+Demo defaults to keep in mind: page size 4096 tokens, `--max-seq-length` 512.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>The hardware: one B200</h1>
+
+<div class="mk" data-mkp="hw"></div>
+
+<table class="mkp-tbl mkp-kv" style="top: 372px">
+<tr><th colspan="2">GPU</th><th colspan="2">per SM</th></tr>
+<tr><td>SMs</td><td>148</td><td>SMEM</td><td>228 KB</td></tr>
+<tr><td>HBM3e</td><td>180 GB, 8 TB/s</td><td>TMEM</td><td>256 KB (128 lanes × 512 cols × 32 bit)</td></tr>
+<tr><td>bf16 tensor cores</td><td>≈ 2.25 PFLOP/s dense</td><td>registers</td><td>64 K × 32 bit</td></tr>
+<tr><td>ridge point</td><td>≈ 280 FLOP / byte</td><td>tensor core</td><td>5th gen (<code>tcgen05</code>), TMA</td></tr>
+<tr class="sum"><td colspan="4" style="font-weight: normal; padding-top: 6px">decode at batch 4: 2 × 4 FLOP per 2-byte weight = 4 FLOP / byte, 70 × below the ridge → memory-bound:<br>
+3.44 GB / 8 TB/s = <b>0.43 ms per step</b> at best</td></tr>
+</table>
+
+<aside class="notes" data-markdown>
+Top: how MPK uses the 148 SMs (`mirage/utils.py`, `get_configurations_from_gpu`): 148 ≥ 144 → 128
+workers; schedulers = 4 × (148 − 128) = 80, packed 4 per CTA (`SCHEDULERS_PER_BLOCK`) on the 20 SMs
+left. Two kernels on two streams (`split_worker_scheduler = true`): `worker_kernel` with 128 CTAs of
+256 threads (B200 builds define `MIRAGE_GRACE_BLACKWELL`), `scheduler_kernel` with 20 CTAs of 128
+threads, one active lane per scheduler warp. Each worker CTA gets 207 − 6 = 201 KB of dynamic SMEM
+for its tasks (`MAX_DYNAMIC_SHARED_MEMORY_SIZE`), the 6 KB reserved for its task-descriptor buffer.
+
+Bottom: B200 figures as published by NVIDIA (HGX B200); **to check** before the talk: HBM capacity
+(180 vs 192 GB depending on SKU), dense bf16 rate. L2 left out until checked.
+
+The lower bound counts weights only; the KV cache adds 112 KB × context per request.
+</aside>
+</section>
+<script src="themes/setup.js"></script>
+
+<!-- ================================================================ -->
+<section class="title">
 <h1>Linear Layer</h1>
 </section>
 
@@ -308,6 +388,173 @@ The 14 padding rows of each m16 tile are merged too but never stored; the O_w va
 
 </section>
 
+<!-- ================================================================ -->
+<section class="title">
+<h1>RMSNorm Layer</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>One task/SM per token</h1>
+
+<div class="mk" data-rn="lanes"></div>
+<div class="gq-cap" data-rn-cap="lanes"></div>
+
+<aside class="notes" data-markdown>
+Qwen3-1.7B decode, batch 8, `rmsnorm_hopper.cuh`: x is 8 × 2048 bf16, w is 2048 bf16, out is
+8 × 2048. One task per token: 8 tasks. Each task reads its own 4 KB row of x **plus the same 4 KB
+row of w** (8 KB in), computes Σ x² → rsqrt(Σ/2048 + ε) → scale by w, and writes its 4 KB row of
+out. No task reads another task's data; w is the only shared input.
+
+x and out as matrices, one dashed ownership lane per task from its row of x to its row of out,
+each lane carrying the task's three phases: read (blue), compute (gold), write (green). Compute is
+a black box here: the next slide opens it.
+
+Direction says who owns what: row i of x sits in line with lane i and feeds it with a straight
+horizontal wire (private to task i); w sits above and drops one vertical bus that joins every
+lane's wire (shared by all). Gold border = the data the current step reads, as on the next slide.
+x, w and out are drawn at the same scale (a 2048-element row = one 120 × 26 px box). The SM
+numbers on the left are illustrative: the scheduler deals the tasks to whichever workers.
+
+Steps: 0 the 8 tasks, one per row; 1–8 the read, one task per step (task i: row i of x + all of
+w, earlier tasks dimmed, later ones greyed); 9 all 8 reads at once; 10 compute; 11 the writes;
+12 all rows of out written. Say on the last step: no task waits for another — the layer is done when
+the slowest is; w is the only shared read, and it comes from L2.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>All warps, then one warp</h1>
+
+<div class="mk" data-rn="zoom" data-ids="1"></div>
+<div class="rn-cap" data-rn-cap="zoom"></div>
+
+<aside class="notes" data-markdown>
+One task, `rmsnorm_hopper.cuh` with `WORKER_NUM_THREADS = 256` (8 warps) on a 2048-bf16 row.
+Time goes left to right; the strip on top (GMEM / SMEM / REG) shows where the data is at each
+step. One slide, two views — the 8 warps and warp 0 alone — with an animated zoom between them:
+the other warps slide in from the bottom when zooming out and away to the bottom when zooming in.
+
+Names: x, w, out are the GMEM rows (`input_ptr`, `weight_ptr`, `output_ptr`); x_s, w_s, out_s are
+their SMEM copies (`shared_input_buffer`, `shared_weight_buffer`, `shared_output_buffer`); red is
+`reduce_smem`. Each buffer is its own grid, 4 KB; braces give the sizes, following the zoom (4 KB per
+buffer and 512 B per warp zoomed out; 512 B for rows 0–31 and 16 B per lane zoomed in). A gold
+border marks the data the current step reads; green, the data written.
+
+Every buffer is drawn **folded into 8 columns of 256** (element e at row e mod 256, column e ÷ 256):
+- the compute layout (`i = t + 256k`) is **row t**, straight across from thread t;
+- the copy layout (thread t ↔ elements 8t … 8t+7, one 16 B `cp.async`) is a vertical stripe in
+  column t ÷ 32, not on thread t's row: the load and the store are drawn as blocks, no thread
+  singled out;
+- zooming on warp 0 = zooming on rows 0–31 of every buffer.
+
+The facts:
+- **Load**: 256 × 16 B `cp.async`, GMEM → SMEM, bypassing the registers; wait + `__syncthreads`,
+  because lane l then reads elements copied by other threads.
+- **Σ x²**: lane l reads x_s[l + 256k], k = 0…7, and sums the squares in a register. It reads x_s
+  only: w_s stays untouched until the scale step.
+- **Intra-warp butterfly**: 5 `shfl_xor` (16, 8, 4, 2, 1). Two steps per stage: one pair (lane 0
+  and its partner in gold: each keeps its own Σ and receives the other's, a + b / b + a — one sum,
+  computed twice), then every lane at once. The tree that fed the gold pair stays in dim gold.
+- **Zoom out**: lane 0 of each warp writes its Σ into `reduce_smem[w]`; `__syncthreads`.
+- **Zoom in**: `Σ = t < 8 ? reduce_smem[t] : 0` — the red cells slide from the warps' lane 0 to
+  lanes 0–7; the writes of warps 1–7 come up from below. 3 `shfl_xor` (4, 2, 1), same two steps
+  per stage; all 8 warps run them, warps 1–7 on zeros. Lane 0 writes the total into
+  `reduce_smem[0]`; `__syncthreads`.
+- **rsqrt**: every thread reads `reduce_smem[0]`, rms_rcp = rsqrt(Σ/2048 + ε) — 256 identical rsqrt.
+- **Scale**: lane l reads row l of x_s and w_s, writes row l of out_s (bf16); `__syncthreads`.
+- **Store**: thread t moves out_s[8t … 8t+7] to GMEM through its registers (128-bit load + store).
+- **Zoom out**: GMEM is touched twice; everything else stays in SMEM and registers.
+
+Zoomed on warp 0, the lane numbers on the left (lane = thread id in warp 0) replace the « warp w »
+labels.
+</aside>
+<script src="themes/rmsnorm.js"></script>
+</section>
+
+<!-- ================================================================ -->
+<section class="takeaway">
+<h2>Key takeaways</h2>
+<h1>RMSNorm Layer</h1>
+<ul>
+<li>One task per token, w is the only shared input</li>
+<li><code>cp.async</code> loads x and w into SMEM, bypassing the registers</li>
+<li>Σ x²: warp shuffles, then across warps through SMEM</li>
+</ul>
+
+</section>
+
+<!-- ================================================================ -->
+<section class="title">
+<h1>SiLU-mul Layer</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>48 tasks, one chunk each</h1>
+
+<div class="mk" data-sl="layer"></div>
+<div class="rn-cap" data-sl-cap></div>
+
+<aside class="notes" data-markdown>
+Qwen3-1.7B decode, batch 4, `tasks/ampere/silu_mul.cuh` (the variant used on B200).
+`silu_mul_layer(input=mlp_mid, output=silu_mul_out, grid_dim=(96 // 2))` in `models/qwen3/builder.py`:
+**48 tasks**. in = mlp_mid, 4 × 12288 bf16 (24 KB per token); out = silu_mul_out, 4 × 6144
+(12 KB per token). out = silu(gate) · up, with silu(g) = g · σ(g).
+
+in and out are drawn at the same scale: an in chunk is 256 columns, an out chunk 128.
+
+Why in is laid out as 48 chunks of 128 gate | 128 up: at load time MPK shuffles the gate_proj and
+up_proj weights into 48 groups (`self.mpk.shuffle_tensors(..., num_groups=96 // 2)` →
+`ShuffledTorchTensor`, materialised by one `cudaMemcpy2DAsync` per source in the generated init code).
+So the gate|up linear writes mlp_mid already interleaved: linear task 2j writes the gate half of chunk
+j, task 2j + 1 the up half, and SiLU-mul task j waits only for those two (event granularity
+gcd(96, 48) = 48). In the kernel: `d_input = input_ptr`, `d_mul = input_ptr + OUTPUT_SIZE` with
+OUTPUT_SIZE = 128, the per-task width.
+
+Steps: 0 in and out; 1 task 0 owns chunk 0 of every token (one 512 B run per token, the next token
+24 KB further) and columns 0–127 of out; 2 task 1, the next chunk; 3 the 48 tasks, on 48 of the
+worker SMs: 2 KB read and 1 KB written each, 96 KB + 48 KB for the layer. No overlap, nothing
+shared, no SMEM.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>One task: 256 threads, 2 passes</h1>
+
+<div class="mk" data-sl="task"></div>
+<div class="rn-cap" data-sl-cap></div>
+
+<aside class="notes" data-markdown>
+Task 0's slice in memory order (g | u per token, then out), cut into 32-column segments. On B200
+the worker CTA has `WORKER_NUM_THREADS = 256` (8 warps); the builder's `block_dim=(128,1,1)` is not
+used. Loop: `for (i = threadIdx.x; i < 4 · 128; i += blockDim.x)` → 512 elements, **2 passes**.
+
+Thread t, pass j: i = t + 256 j, token 2j + t ÷ 128, column t mod 128. So warp w takes token
+2j + w ÷ 4, columns 32 (w mod 4) … + 31: warps 0–3 on the even token, warps 4–7 on the odd one.
+
+Zoom on warp 0: lane l reads column l of g and of u (2 B each) and writes column l of out: every g
+load, u load and out store of a warp is 32 × 2 B = **one 64 B request** (two 32 B sectors).
+
+Per element: g → fp32, silu(g) = g / (1 + e^−g) rounded to bf16, × u. Plain GMEM loads into
+registers: no SMEM, no cp.async, no `__syncthreads` inside the task.
+</aside>
+<script src="themes/silu-mul.js"></script>
+</section>
+
+<!-- ================================================================ -->
+<section class="takeaway">
+<h2>Key takeaways</h2>
+<h1>SiLU-mul Layer</h1>
+<ul>
+<li>Up and Gate weights are shuffled during initialization</li>
+<li>Each warp reads and writes 64 B at once: coalesced, no SMEM</li>
+<li>2 KB in, 1 KB out per task: purely memory-bound</li>
+</ul>
+
+</section>
 
 </div>
 </div>
