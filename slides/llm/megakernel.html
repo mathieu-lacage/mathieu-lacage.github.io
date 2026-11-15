@@ -556,6 +556,138 @@ registers: no SMEM, no cp.async, no `__syncthreads` inside the task.
 
 </section>
 
+<!-- ================================================================ -->
+<section class="title">
+<h1>Split-K Linear Layer</h1>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>128 tasks: 16 row blocks × 8 K slices</h1>
+
+<div class="mk" data-sk="layer"></div>
+<div class="sk-caps" data-sk-cap>
+<p data-step="0">Split K: 128 tasks, one per A tile</p>
+<p data-step="1" class="is-off">Task (0, 2) reads one cell of A and slice 2 of B, and adds its <b>partial</b> into row block 0 of x</p>
+<p data-step="2" class="is-off">Task (0, 5): same row block of x, its partial adds on top of the first one</p>
+<p data-step="3" class="is-off">The other 126, each running in parallel on separate SMs</p>
+</div>
+
+<aside class="notes" data-markdown>
+Qwen3-1.7B's down_proj at decode, batch 4, on B200: x += A · B with A = the down_proj weights
+(2048 × 6144 bf16, 24 MB), B = silu_mul_out (6144 × 4), x = the residual stream (2048 × 4). Drawn in
+the C = A · B layout: B above x, A to the left of x; K is drawn 1.2 × M, not 3 ×.
+
+`models/qwen3/builder.py`: on B200 (`target_cc == 100`) o_proj and down_proj use
+`splitk_linear_layer(output=self.x, grid_dim=grid_for_splitk_linear_layer(2048, K))`:
+**16** row blocks of 128 (`MMA_M`) × **8** K slices (the largest s ≤ 128·128 / 2048 with K / s a
+multiple of 64) = **128 tasks**, one per worker. down_proj: K slice 768 = 12 strips of 64; o_proj: 256.
+Cut only by rows, as in the Linear section, there would be 16 tasks of 1.5 MB of weights each.
+
+Each step: one task's cell of A (128 × 768, 192 KB) and K slice of B (768 × 4, 6 KB) read (gold),
+its row block of x written (green, 128 × 4 bf16 = 1 KB); a used cell and its worker go back to the
+empty colour. x is a heatmap of the partial sums added so far (illustrative values): a row block is
+complete after its 8th partial. Steps 1–2 are tasks (0, 2) and (0, 5), two partials into the same
+row block; step 3 plays the other 126. On the GPU the 128 tasks run at the same time and finish in
+any order.
+
+The task is the Linear section's `linear_sm100_mpk_task_impl` with `SplitK = true`: its epilogue
+ends with `tma_reduce_add_async` (`cp.reduce.async.bulk.tensor … .add`) instead of a TMA store.
+PTX: each element-wise add is atomic, `.relaxed.gpu`; the adds are done in the memory system (L2),
+in bf16, in whatever order the tasks finish, so the last bits of x are not reproducible. And x is the
+residual stream: the residual add comes for free.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>One task: warps and threads</h1>
+
+<div class="mk" data-sk="task"></div>
+<div class="sk-caps" data-sk-cap>
+<p data-step="0">Task (0, 2): A and B go through an 8-slot SMEM ring before the tensor core</p>
+<p data-step="1" class="is-off"><b>Warp 5</b>: one lane issues the TMA copy of strip 0 into slot 0</p>
+<p data-step="2" class="is-off"><b>Warp 5</b> keeps going: strips 1–7 fill the ring</p>
+<p data-step="3" class="is-off"><b>Warp 4</b>, MMA 1 of 4 on slot 0: K 0–15 of the strip, 128 × 16 · 16 × 4, into TMEM</p>
+<p data-step="4" class="is-off"><b>Warp 4</b>, MMA 2 of 4 on slot 0 (strip 0)</p>
+<p data-step="5" class="is-off"><b>Warp 4</b>, MMA 3 of 4 on slot 0 (strip 0)</p>
+<p data-step="6" class="is-off"><b>Warp 4</b>, MMA 4 of 4 on slot 0 (strip 0), slot freed</p>
+<p data-step="7" class="is-off"><b>Warp 5</b> refills slot 0 with strip 8</p>
+<p data-step="8" class="is-off"><b>Warp 4</b>, MMA 1 of 4 on slot 1 (strip 1)</p>
+<p data-step="9" class="is-off"><b>Warp 4</b>, MMA 2 of 4 on slot 1 (strip 1)</p>
+<p data-step="10" class="is-off"><b>Warp 4</b>, MMA 3 of 4 on slot 1 (strip 1)</p>
+<p data-step="11" class="is-off"><b>Warp 4</b>, MMA 4 of 4 on slot 1 (strip 1), slot freed</p>
+<p data-step="12" class="is-off"><b>Warp 5</b>: strip 9 into slot 1</p>
+<p data-step="13" class="is-off"><b>Warp 4</b>, MMA 1 of 4 on slot 2 (strip 2)</p>
+<p data-step="14" class="is-off"><b>Warp 4</b>, MMA 2 of 4 on slot 2 (strip 2)</p>
+<p data-step="15" class="is-off"><b>Warp 4</b>, MMA 3 of 4 on slot 2 (strip 2)</p>
+<p data-step="16" class="is-off"><b>Warp 4</b>, MMA 4 of 4 on slot 2 (strip 2), slot freed</p>
+<p data-step="17" class="is-off"><b>Warp 5</b>: strip 10 into slot 2</p>
+<p data-step="18" class="is-off"><b>Warp 4</b>, MMA 1 of 4 on slot 3 (strip 3)</p>
+<p data-step="19" class="is-off"><b>Warp 4</b>, MMA 2 of 4 on slot 3 (strip 3)</p>
+<p data-step="20" class="is-off"><b>Warp 4</b>, MMA 3 of 4 on slot 3 (strip 3)</p>
+<p data-step="21" class="is-off"><b>Warp 4</b>, MMA 4 of 4 on slot 3 (strip 3), slot freed</p>
+<p data-step="22" class="is-off"><b>Warp 5</b>: strip 11 into slot 3</p>
+<p data-step="23" class="is-off"><b>Warp 4</b>, MMA 1 of 4 on slot 4 (strip 4)</p>
+<p data-step="24" class="is-off"><b>Warp 4</b>, MMA 2 of 4 on slot 4 (strip 4)</p>
+<p data-step="25" class="is-off"><b>Warp 4</b>, MMA 3 of 4 on slot 4 (strip 4)</p>
+<p data-step="26" class="is-off"><b>Warp 4</b>, MMA 4 of 4 on slot 4 (strip 4), slot freed — nothing left to load, the ring drains</p>
+<p data-step="27" class="is-off"><b>Warp 4</b>: the MMAs of strips 5–11, slot by slot — nothing left to load, the ring drains</p>
+<p data-step="28" class="is-off"><b>tcgen05.ld</b>: warp w copies TMEM lanes 32w … 32w + 31; thread 37 (warp 1, lane 5): row 37</p>
+<p data-step="29" class="is-off">Zoom on warp 1: lane l holds row 32 + l; thread 37 = lane 5, 16 fp32 registers, 64 B</p>
+<p data-step="30" class="is-off">Each lane converts its 16 fp32 to bf16: thread 37's row in 8 registers, 32 B</p>
+<p data-step="31" class="is-off"><b>st.shared</b>: lane l writes row 32 + l of the SMEM C stage; thread 37 writes row 37</p>
+<p data-step="32" class="is-off">Back to the 4 warps: the 128 × 16 bf16 tile, 4 KB, is in SMEM</p>
+<p data-step="33" class="is-off">A lane of warp 0 issues the TMA reduce-add: the 4 real columns, 1 KB, into rows 0–127 of x</p>
+</div>
+
+<aside class="notes" data-markdown>
+Task (0, 2), `tasks/blackwell/linear_sm100_mpk.cuh`, 256 threads = 8 warps, each with a role.
+Its cell of A (128 × 768) and slice of B (768 × 4) are cut in 12 K-strips of 64. Gold = read in this
+step, green = written; data flies from source to destination when stepping forward.
+
+**Main loop**, through the 8-slot SMEM ring (`NUM_AB_STAGE`; a slot = A strip 128 × 64, 16 KB, + B
+strip, 18 KB with B padded to 16 rows; drawn at the scale of A and B):
+- **warp 5** (TMA): one lane waits for a free slot (`ab_empty`) and issues the TMA copies of strip
+  k into slot k mod 8; copied strips of A and B go to the empty colour;
+- **warp 4** (MMA): one lane waits for a full slot (`ab_full`) and issues its 4 `tcgen05.mma`,
+  one per step: MMA j reads K 16j … 16j + 15 of the slot (128 × 16 of A, 16 × 4 of B) and adds into
+  TMEM, 128 lanes × 16 fp32 columns (4 tokens + 12 of padding: N = 16 at M = 128); after the 4th,
+  `umma_arrive` frees the slot.
+
+Order: copies 0–7 fill the ring, then MMAs of strip 0, copy 8, … copy 11; after strip 4 nothing is
+left to load and the MMAs of strips 5–11 drain the ring (one step). On the GPU the two warps run at
+the same time, each waiting on its barrier; at decode warp 4 mostly waits for HBM.
+
+**Epilogue**, warps 0–3, thread t owns row t (one colour per warp; the column between TMEM and
+the registers puts thread t in line with row t):
+1. `tcgen05.ld`: warp w can only reach TMEM lanes 32w … 32w + 31; thread t gets row t,
+   16 fp32 registers (64 B; 8 KB in all); then `acc_empty`;
+2. zoom on warp 1 (lane l on row 32 + l); thread 37 = warp 1, lane 5, is outlined throughout;
+3. fp32 → bf16: 16 values in 8 registers (32 B; 4 KB in all);
+4. `st.shared`: row t of the SMEM C stage, 128 × 16 bf16 = 4 KB (laid out for the TMA);
+5. zoom out;
+6. one lane of warp 0 issues the TMA reduce-add of the 4 real columns (the tensor map clips the
+   padding): 128 × 4 bf16 = 1 KB added into rows 0–127 of x.
+
+Warps 6–7 do nothing in this task. Heatmap values are illustrative.
+</aside>
+<script src="themes/splitk.js"></script>
+</section>
+
+<!-- ================================================================ -->
+<section class="takeaway">
+<h2>Key takeaways</h2>
+<h1>Split-K Linear Layer</h1>
+<ul>
+<li>A is tiled so we have 128 tasks, all streaming weights in parallel</li>
+<li>Buffered reads maximize bandwidth usage and MMA FLOPS</li>
+<li>Partials are reduced atomically in L2 cache</li>
+<li>Specialized warps: w5 reads, w4 multiplies, w0–w3 write back</li>
+</ul>
+
+</section>
+
 </div>
 </div>
 
