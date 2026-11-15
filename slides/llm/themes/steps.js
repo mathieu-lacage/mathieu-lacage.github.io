@@ -26,3 +26,9 @@ window.steps = (root, n, onStep) => {
   marks.forEach((m) => mo.observe(m, { attributes: true, attributeFilter: ['class'] }));
   update();
 };
+
+// Captions written in the slide: the caption box (<div class="mk-caps">) holds one <p data-step="i"> per
+// step (step i's text, possibly empty). steps.caption(box, st) shows step st's and sets .is-off on the
+// others; steps.count(box) is the number of steps it describes.
+window.steps.caption = (box, st) => box.querySelectorAll('[data-step]').forEach((e) => e.classList.toggle('is-off', +e.dataset.step !== st));
+window.steps.count = (box) => box.querySelectorAll('[data-step]').length;

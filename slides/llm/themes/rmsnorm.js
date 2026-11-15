@@ -19,7 +19,7 @@
   const T = (x, y, s, a = '') => `<text x="${x}" y="${y}" ${a}>${s}</text>`;
   const L = (x1, y1, x2, y2, a = '') => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ${a}/>`;
   const lab = (x, y, s, a = '') => T(x, y, s, `font-size="13" font-weight="600" fill="${C.slate}" letter-spacing=".06em" ${a}`);
-  // curly brace (themes/megakernel.js), label outside
+  // curly brace, label outside
   const curly = (x1, y1, x2, y2, w, q = 0.6) => {
     const len = Math.hypot(x1 - x2, y1 - y2), dx = (x1 - x2) / len, dy = (y1 - y2) / len;
     const at = (f, k) => `${x1 - f * len * dx + k * w * dy},${y1 - f * len * dy - k * w * dx}`;
@@ -102,13 +102,13 @@
     if (ph >= 3) o += T(S0 + RD + CO + 16 + WR / 2, 250, 'store out', `font-size="14" fill="${C.green}" text-anchor="middle"`);
     return o;
   };
-  // [phase, only, caption]: the read goes one task per step, then all 8 at once
-  const STA = [[0, -1, 'Decode batch 8: <b>one task per token</b>, task i owns row i of x and row i of out'],
-    ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => [1, i, `<b>Read</b>: task ${i} copies <b>row ${i}</b> of x and <b>all</b> of w, 8 KB`]),
-    [1, -1, '<b>Read</b>: each task copies <b>its own</b> row of x and the <b>shared</b> row of w, 8 KB'],
-    [2, -1, '<b>Compute</b>: Σ x², rsqrt(Σ/2048 + ε), scale by w'],
-    [3, -1, '<b>Write</b>: each task stores its 4 KB row of out'],
-    [4, -1, '']];
+  // [phase, only]: the read goes one task per step, then all 8 at once
+  const STA = [[0, -1],
+    ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => [1, i]),
+    [1, -1],
+    [2, -1],
+    [3, -1],
+    [4, -1]];
 
   document.querySelectorAll('div.mk[data-rn="lanes"]').forEach((root) => {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -118,7 +118,7 @@
     steps(root, STA.length - 1, (st) => {
       if (st === null) st = STA.length - 1;
       svg.innerHTML = figA(STA[st][0], STA[st][1]);
-      cap.innerHTML = STA[st][2];
+      steps.caption(cap, st);
     });
   });
 })();
@@ -136,34 +136,34 @@
   const sm = (x, y, s, col = C.slate, a = '') => T(x, y, s, `font-size="12" fill="${col}" ${a}`);
   const KC = { r: C.blue, w: C.green, c: C.gold };
 
-  // the steps: [group, sub-step (butterfly stages shown), zoom (0 = all 8 warps, 1 = warp 0), caption]
+  // the steps: [group, sub-step (butterfly stages shown), zoom (0 = all 8 warps, 1 = warp 0)]
   const STEPS = [
-    [1, 0, 0, '<code>cp.async</code> of 16 B move x and w GMEM → SMEM, bypassing the registers'],
-    [2, 0, 1, 'Sum square per lane'],
-    [3, [1, 'pair'], 1, 'Pairwise sum 16 lanes apart'],
-    [3, [1, 'a'], 1, ''],
-    [3, [2, 'pair'], 1, 'Pairwise sum 8 lanes apart'],
-    [3, [2, 'a'], 1, ''],
-    [3, [3, 'pair'], 1, 'Pairwise sum 4 lanes apart'],
-    [3, [3, 'a'], 1, ''],
-    [3, [4, 'pair'], 1, 'Pairwise sum 2 lanes apart'],
-    [3, [4, 'a'], 1, ''],
-    [3, [5, 'pair'], 1, 'Pairwise sum 1 lane apart'],
-    [3, [5, 'a'], 1, ''],
-    [4, 0, 0, 'Lane 0 of each warp writes back its partial sum to SMEM'],
-    [5, [0, 'a'], 1, 'Lanes 0–7 of warp 0 read back the partial sums from SMEM'],
-    [5, [1, 'pair'], 1, 'Pairwise sum 4 lanes apart'],
-    [5, [1, 'a'], 1, ''],
-    [5, [2, 'pair'], 1, 'Pairwise sum 2 lanes apart'],
-    [5, [2, 'a'], 1, ''],
-    [5, [3, 'pair'], 1, 'Pairwise sum 1 lane apart'],
-    [5, [3, 'a'], 1, ''],
-    [5, [3, 'w'], 1, 'Lane 0 of warp 0 writes back the sum to SMEM'],
-    [6, 0, 1, 'Every lane of every warp reads back the sum from SMEM, computes rms_rcp = rsqrt(Σ/2048 + ε)'],
-    [7, 0, 1, 'Every lane of every warp computes out_s = x · rms_rcp · w'],
-    [8, 0, 1, 'Read back the final result into registers and write it back to GMEM'],
-    [9, 0, 0, '']];
-  const CAPS = STEPS.map((x) => x[3]), ZOOM = STEPS.map((x) => x[2]);
+    [1, 0, 0],
+    [2, 0, 1],
+    [3, [1, 'pair'], 1],
+    [3, [1, 'a'], 1],
+    [3, [2, 'pair'], 1],
+    [3, [2, 'a'], 1],
+    [3, [3, 'pair'], 1],
+    [3, [3, 'a'], 1],
+    [3, [4, 'pair'], 1],
+    [3, [4, 'a'], 1],
+    [3, [5, 'pair'], 1],
+    [3, [5, 'a'], 1],
+    [4, 0, 0],
+    [5, [0, 'a'], 1],
+    [5, [1, 'pair'], 1],
+    [5, [1, 'a'], 1],
+    [5, [2, 'pair'], 1],
+    [5, [2, 'a'], 1],
+    [5, [3, 'pair'], 1],
+    [5, [3, 'a'], 1],
+    [5, [3, 'w'], 1],
+    [6, 0, 1],
+    [7, 0, 1],
+    [8, 0, 1],
+    [9, 0, 0]];
+  const ZOOM = STEPS.map((x) => x[2]);
   const NS = STEPS.length - 1;
   let zz = 0;                                             // the current zoom
   let IDS = '', CLIP = '';
@@ -438,10 +438,10 @@
     const draw = (st, z, showCur) => { IDS = mode; CLIP = clip; zz = z; sp = SPM * Math.pow(SPS / SPM, z); svg.innerHTML = fig(st, showCur); };
     steps(root, NS, (st) => {
       cancelAnimationFrame(raf);
-      if (st === null) { cap.innerHTML = CAPS[NS]; draw(NS, ZOOM[NS], true); return; }
+      if (st === null) { steps.caption(cap, NS); draw(NS, ZOOM[NS], true); return; }
       const prev = curSt, z0 = curZ, z1 = ZOOM[st];
       curSt = st;
-      cap.innerHTML = CAPS[st];
+      steps.caption(cap, st);
       if (z0 === z1 || reduce) { curZ = z1; draw(st, z1, true); return; }
       // zoom first (the new step's drawing appears when the zoom lands), 900 ms ease-in-out
       const t0 = performance.now(), D = 900;

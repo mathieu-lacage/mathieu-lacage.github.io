@@ -1,5 +1,5 @@
 // « Megakernels », « Accumulate from GMEM into registers »: task (r2, KV 5) of the attention layer
-// (tasks/blackwell/attention_sm100.cuh), drawn like the linear task's ring slide (themes/megakernel.js), top to
+// (tasks/blackwell/attention_sm100.cuh), drawn top to
 // bottom: GMEM (attn_in's slice of the task, the K and V page pools), SMEM (Q once, a double buffer of 64-key
 // K and V tiles, cp.async by all 128 threads), registers (mma.sync: per warp its 16 keys of the tile, S_w and
 // the partial O_w). Bottom right, the same work as matrices: request 2's 16 query heads, this task's rows
@@ -39,17 +39,6 @@
   const PX = 330, PP = 62, PW = 56, KPY = 172, VPY = 212, PH = 26;
   const tileAt = (Y, t) => [PX + TABLE[t >> 2] * PP + (t & 3) * (PW / 4), Y, PW / 4, PH];
   const ctr = ([x, y, w, h]) => [x + w / 2, y + h / 2, w, h];
-
-  const CAPS = [
-    'Q and the new K, V are in <b>attn_in</b>, the 1023 cached keys in the <b>K and V pages</b>, all in GMEM',
-    'Q first, once: 2 rows (Q heads 10, 11) into a 16-row SMEM tile, then RMSNorm + RoPE in SMEM',
-    'Tile 0 = keys 0–63 = page 6, slots 0–63: all 128 threads <b>cp.async</b> its K and V into buffer 0',
-    'Tile 1 is issued into buffer 1 <b>before</b> tile 0 is used: cp_async_wait&lt;1&gt; only waits for tile 0',
-    'The 4 warps read tile 0 from SMEM: warp w takes its <b>16 keys</b>, S<sub>w</sub> = Q K<sub>w</sub>ᵀ, then O<sub>w</sub> += P<sub>w</sub> V<sub>w</sub> (mma.sync)',
-    'Buffer 0 is free: tile 2 goes in while the warps work on tile 1',
-    'Tiles 2 … 14: two buffers, one landing while the other is read. Page 2, 9, 0: only the page table changes',
-    'Tile 15: K₅ gets RMSNorm + RoPE in SMEM; K₅, V₅ are <b>stored to page 0, slot 255</b>, then the 4 warps compute',
-  ];
 
   const S0 = () => ({ q: false, buf: [{ t: -1, st: 'empty' }, { t: -1, st: 'empty' }], wr: 0, rd: -1, acc: 0, comp: -1,
     lit: {}, written: false });
@@ -285,20 +274,11 @@
       ...Array.from({ length: 14 }, (_, n) => (S) => tick(S, n + 1)),
       (S) => { tick(S, 15); S.written = true; S.ev.push(['store', 15]); },
     ];
-    const STEP_CAPS = [...CAPS.slice(0, 5),
-      ...Array.from({ length: 14 }, (_, n) => {
-        const t = n + 1;
-        if (t === 1) return CAPS[5];
-        if (t % 4 === 0) return `Tile ${t}: <b>page ${TABLE[t >> 2]}</b> begins; only the page table lookup changes. Tile ${t + 1} goes into the other buffer`;
-        if (t === 14) return 'Tile 14 is read while tile 15 is copied: keys 960–1022 from page 0, <b>K₅, V₅ (key 1023) from attn_in</b>';
-        return `Tile ${t} (page ${TABLE[t >> 2]}) is read from buffer ${t % 2} while tile ${t + 1} is copied into buffer ${(t + 1) % 2}`;
-      }),
-      CAPS[7]];
     const STATES = [S0()];
     for (const f of APPLY) { const s = clone(STATES[STATES.length - 1]); s.ev = []; f(s); STATES.push(s); }
     steps(root, APPLY.length, (st) => {
       if (st === null) st = APPLY.length;
-      cap.innerHTML = STEP_CAPS[st];
+      steps.caption(cap, st);
       render(STATES[st]);
     });
   });

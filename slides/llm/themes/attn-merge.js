@@ -99,21 +99,16 @@
       markerUnits="userSpaceOnUse" orient="auto"><path d="M0.5,1.2 L9,5 L0.5,8.8 L3,5 Z" fill="${col}" stroke="${col}" stroke-width=".6" stroke-linejoin="round"/></marker>`).join('');
     return `<defs>${defs}</defs>` + o;
   };
-  const CAP_FLOW = ['End of the loop: each warp holds, per Q head, its max(S), ΣP and O_w, in registers',
-    '<b>Spill</b>: each warp copies them to SMEM, then a barrier: now every warp can read every partial',
-    ...[0, 1, 2, 3].map((w) => `<b>Warp ${w}</b> merges columns ${32 * w}–${32 * w + 31}: that band of all 4 partials, and their max(S), ΣP`),
-    '<b>Store</b>: each warp writes its 2 × 32 values to attn_out (one 2-byte store per thread and row)',
-    'Together: KV head 5\'s 256 columns of token 1023\'s row, 512 B; then the task\'s event fires'];
 
   document.querySelectorAll('div.mk[data-mg="flowv"]').forEach((root) => {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 1280 720');
     root.appendChild(svg);
-    const cap = root.parentElement.querySelector('[data-mg-cap="flowv"]');
-    steps(root, CAP_FLOW.length - 1, (st) => {
-      if (st === null) st = CAP_FLOW.length - 1;
+    const cap = root.parentElement.querySelector('[data-mg-cap="flowv"]'), n = steps.count(cap) - 1;
+    steps(root, n, (st) => {
+      if (st === null) st = n;
       svg.innerHTML = flowV(st);
-      cap.innerHTML = CAP_FLOW[st];
+      steps.caption(cap, st);
     });
   });
 })();

@@ -103,110 +103,6 @@ The lower bound counts weights only; the KV cache adds 112 KB × context per req
 
 <!-- ================================================================ -->
 <section class="title">
-<h1>Linear Layer</h1>
-</section>
-
-<!-- ================================================================ -->
-<section>
-<h1>96 tasks on 96 SMs</h1>
-
-<div class="mk" data-mk="layer"></div>
-
-<aside class="notes" data-markdown>
-Qwen3-1.7B's gate + up projection at decode, batch 8, as Mirage's `demo/qwen3/demo.py` runs it on
-a B200: C (12288 × 8) = A (12288 × 2048) · B (2048 × 8). A = the gate and up weights side by side
-(2 × 6144 rows), B = the 8 tokens after the RMSNorm, C = the input of SiLU-mul. M is drawn 2.5 ×
-too short: to scale, a task would be a 7.5 px row.
-
-**Step 0.** A and C are cut in 96 blocks of 128 rows: one task each (`grid_dim = 96`, so each
-task's `OUTPUT_SIZE` is exactly one `MMA_M = 128` tile). B is not cut: every task reads all of it.
-
-**Step 1.** The B200 runs 128 workers, so all 96 tasks start at about the same time, each on its
-own SM. Each TMA warp issues its first 8 strips of A and B (faint blue): 96 SMEM rings fill at
-once; the first strips land and go to the tensor cores (gold).
-
-**Step 2 (auto-plays).** The 96 fronts sweep K together, each at its own pace (start offset, HBM
-contention). Each task streams its own 128 rows of A from HBM (512 KB; 50 MB for the layer, in
-bf16): that is what makes them memory-bound. All 96 read the whole of B, but B is only 32 KB and
-stays in L2. Each C block warms up as its TMEM accumulator fills, then turns solid gold when its
-epilogue stores it, without waiting for the other tasks. The layer is done when the slowest task is.
-
-Next slide: zoom into one task.
-</aside>
-</section>
-
-<!-- ================================================================ -->
-<section>
-<h1>One task: read from GMEM, MMA into TMEM</h1>
-
-<div class="mk" data-mk="ring"></div>
-
-<aside class="notes" data-markdown>
-Source: Mirage persistent kernel, `tasks/blackwell/linear_sm100_mpk.cuh`. Task 5 of Qwen3-1.7B's
-gate + up computes 128 output features: C (128 × 8) = A (128 × 2048) · B (2048 × 8), K cut into
-32 strips of 64.
-
-**Warp roles.** Warp 5 is the TMA producer, warp 4 the MMA issuer, warps 0–3 the epilogue.
-
-**The ring.** 8 SMEM slots (`NUM_AB_STAGE`), each holding A strip k (128 × 64, 16 KB) and B
-strip k (64 × 8). `smem_wr_buffer` and `smem_rd_buffer` are two cursors into the same ring,
-both equal to k % 8. Per slot, two mbarriers: `ab_full` (completed by the TMA's transaction
-bytes) and `ab_empty` (signalled by the MMA with `umma_arrive` once its 4 MMAs are done).
-
-**The MMAs.** 4 × `tcgen05.mma` per strip (`k_block` 0…3), each (128 × 16) · (16 × 8), read
-from SMEM in place through descriptors and added directly into the TMEM accumulator: 128 MMAs for
-the task. There is no per-strip partial: `ScaleOut::Zero` only on the very first MMA.
-
-**Memory-bound.** At decode batch sizes the MMA always waits on the next `ab_full`: 7 of the 8
-slots are in flight at any time, the faint blue window in A and B.
-
-**Next slide.** Once all 32 strips are in, C holds the finished 128 × 8 block in TMEM.
-</aside>
-</section>
-
-<!-- ================================================================ -->
-<section>
-<h1>One task: write back to GMEM</h1>
-
-<div class="mk" data-mk="epilogue"></div>
-
-<aside class="notes" data-markdown>
-Warps 0–3, the epilogue, take over once all 32 strips are in. C, as it ends the previous slide,
-is magnified on the right: the TMEM accumulator, 128 lanes × 16 columns (8 of them
-padding: the tensor core needs N a multiple of 16 at M = 128). Every buffer after it is drawn
-the same way, features × tokens.
-
-1. `acc_full`, then `tcgen05.ld`: warp w can only reach lanes 32w…32w+31, so each warp copies its
-   own band; thread t gets row t in `tTR_rAcc`, 16 fp32 registers (64 B). Then `acc_empty`: TMEM
-   is free.
-2. fp32 → bf16 into a second register tensor, `tCrC`: 16 bf16 per thread (32 B, packed two per
-   register). Gate + up has no bias or residual (the plain `linear_sm100` task).
-3. `st.shared`: thread t writes its row into the SMEM C stage, a 128 × 16 bf16 tile (4 KB).
-4. Fence + named barrier, then one thread of warp 0 issues the TMA store of the 8 real columns:
-   task 5's 128 rows of out. In memory out is token-major (8 × 12288), so the store writes 8
-   runs of 256 B, 24 576 B apart; the SMEM tile is already laid out for it (`sC` stride (128, 1)).
-
-One tile per task, so one of the 2 TMEM stages (`NUM_ACC_STAGE`) and one of the 4 SMEM C stages
-(`NUM_C_STAGE`) are used. They matter for multi-tile tasks: the LM head runs 10 tiles per task,
-the MMA filling one TMEM stage while the epilogue drains the other, and up to 3 TMA stores in
-flight while the next tile is written to SMEM.
-</aside>
-<script src="themes/megakernel.js"></script>
-</section>
-
-<!-- ================================================================ -->
-<section class="takeaway">
-<h2>Key takeaways</h2>
-<h1>Linear Layer</h1>
-<ul>
-<li>Matrix A is sliced across rows, one parallel task per SM</li>
-<li>Buffered reads maximize bandwidth usage and MMA FLOPS</li>
-</ul>
-
-</section>
-
-<!-- ================================================================ -->
-<section class="title">
 <h1>Paged Attention Layer</h1>
 </section>
 
@@ -248,7 +144,13 @@ attention task itself (next slide).
 <h1>One request, one task per head</h1>
 
 <div class="mk" data-mkd="heads"></div>
-<div class="gq-cap" data-mkd-cap="heads"></div>
+<div class="mk-caps" data-mkd-cap="heads">
+<p data-step="0"><b>attn_in</b>: request 2's new token from the QKV linear, 16 Q, 8 K, 8 V heads by KV head</p>
+<p data-step="1" class="is-off">Each KV head's group goes to <b>its task</b>: 2 Q rows, the new key and the new value</p>
+<p data-step="2" class="is-off">Task (r2, KV 0): its 2 Q rows read the <b>same 1024 keys</b>, each fills <b>its own row</b> of A</p>
+<p data-step="3" class="is-off">The 8 tasks run at once on 8 SMs, each with its K, V: <b>16 rows</b>, filled independently</p>
+<p data-step="4" class="is-off">Each row: softmax over all 1024 keys (no mask at decode), then O = A V</p>
+</div>
 
 <aside class="notes" data-markdown>
 Request 2 at decode: 1 new token, 1024 keys of context, one layer of Qwen3-1.7B (16 query heads, 8 KV
@@ -276,7 +178,23 @@ and values are made up; the 8 tasks share nothing and run in parallel on 8 SMs.
 <h1>Softmax: textbook vs online</h1>
 
 <div class="mk" data-sm="two"></div>
-<div class="gq-cap" data-sm-cap="two"></div>
+<div class="mk-caps" data-sm-cap="two">
+<p data-step="0">The same 8 scores, softmaxed two ways</p>
+<p data-step="1" class="is-off">Textbook: max(S) of the row, exp, ΣP, divide. It needs <b>the whole row</b> before it can start</p>
+<p data-step="2" class="is-off">Online, key 0: the first max(S); its P is exp(0) = 1</p>
+<p data-step="3" class="is-off">Key 1: below max(S), its P is added to ΣP. Only max(S) and ΣP are carried to the next key</p>
+<p data-step="4" class="is-off">Key 2: a <b>new max(S)</b></p>
+<p data-step="5" class="is-off">Every P so far, and ΣP, used the old max: <b>rescale</b> them by exp(old − new)</p>
+<p data-step="6" class="is-off">Then key 2's own P = 1 is added to ΣP</p>
+<p data-step="7" class="is-off">Key 3: below max(S), its P is added to ΣP. Only max(S) and ΣP are carried to the next key</p>
+<p data-step="8" class="is-off">Key 4: a <b>new max(S)</b></p>
+<p data-step="9" class="is-off">Every P so far, and ΣP, used the old max: <b>rescale</b> them by exp(old − new)</p>
+<p data-step="10" class="is-off">Then key 4's own P = 1 is added to ΣP</p>
+<p data-step="11" class="is-off">Key 5: below max(S), its P is added to ΣP. Only max(S) and ΣP are carried to the next key</p>
+<p data-step="12" class="is-off">Key 6: below max(S), its P is added to ΣP. Only max(S) and ΣP are carried to the next key</p>
+<p data-step="13" class="is-off">Key 7: below max(S), its P is added to ΣP. Only max(S) and ΣP are carried to the next key</p>
+<p data-step="14" class="is-off">A = P / ΣP: <b>exactly the textbook result</b>, in one pass over the keys</p>
+</div>
 
 <aside class="notes" data-markdown>
 One query head, 8 keys, made-up scores (the running max changes at keys 0, 2 and 4); every number on
@@ -300,7 +218,12 @@ same way, see the next slide.) This is the online softmax of FlashAttention (Mil
 <h1>One request, one task per head: S, P, d</h1>
 
 <div class="mk" data-mkd="heads-spd"></div>
-<div class="gq-cap" data-mkd-cap="heads-spd"></div>
+<div class="mk-caps" data-mkd-cap="heads-spd">
+<p data-step="0">Request 2 decodes 1 token. One layer: <b>8 tasks</b>, one per KV head; each serves <b>2 query heads</b></p>
+<p data-step="1" class="is-off">Task (r2, KV 0), per Q head: <b>S</b> = q·kᵀ/√d<sub>h</sub>, <b>P</b> = exp(S − m), m the running max, <b>d</b> = Σ P</p>
+<p data-step="2" class="is-off">The 8 tasks run at once on 8 SMs: 16 Q heads, each its own S, P, d, as the keys stream</p>
+<p data-step="3" class="is-off">Once all 1024 keys are in: <b>O = (Σ P·V) / d</b>, written once per head</p>
+</div>
 
 <aside class="notes" data-markdown>
 The previous slide, with what each query head keeps while its keys stream: the online softmax.
@@ -322,10 +245,31 @@ the end (« merge » slide).
 <h1>Accumulate from GMEM into registers</h1>
 
 <div class="mk" data-mkc="copy"></div>
-<div class="gq-cap" data-mkc-cap="copy"></div>
+<div class="mk-caps" data-mkc-cap="copy">
+<p data-step="0">Q and the new K, V are in <b>attn_in</b>, the 1023 cached keys in the <b>K and V pages</b>, all in GMEM</p>
+<p data-step="1" class="is-off">Q once: 2 rows (Q heads 10, 11) into a 16-row SMEM tile, then RMSNorm + RoPE in SMEM</p>
+<p data-step="2" class="is-off">Tile 0 = keys 0–63 = page 6, slots 0–63: all 128 threads <b>cp.async</b> its K and V into buffer 0</p>
+<p data-step="3" class="is-off">Tile 1 is issued into buffer 1 <b>before</b> tile 0 is used: cp_async_wait&lt;1&gt; only waits for tile 0</p>
+<p data-step="4" class="is-off">The 4 warps read tile 0: warp w takes its <b>16 keys</b>, S<sub>w</sub> = Q K<sub>w</sub>ᵀ, O<sub>w</sub> += P<sub>w</sub> V<sub>w</sub> (mma.sync)</p>
+<p data-step="5" class="is-off">Buffer 0 is free: tile 2 goes in while the warps work on tile 1</p>
+<p data-step="6" class="is-off">Tile 2 (page 6) is read from buffer 0 while tile 3 is copied into buffer 1</p>
+<p data-step="7" class="is-off">Tile 3 (page 6) is read from buffer 1 while tile 4 is copied into buffer 0</p>
+<p data-step="8" class="is-off">Tile 4: <b>page 2</b> begins; only the page table lookup changes. Tile 5 goes into the other buffer</p>
+<p data-step="9" class="is-off">Tile 5 (page 2) is read from buffer 1 while tile 6 is copied into buffer 0</p>
+<p data-step="10" class="is-off">Tile 6 (page 2) is read from buffer 0 while tile 7 is copied into buffer 1</p>
+<p data-step="11" class="is-off">Tile 7 (page 2) is read from buffer 1 while tile 8 is copied into buffer 0</p>
+<p data-step="12" class="is-off">Tile 8: <b>page 9</b> begins; only the page table lookup changes. Tile 9 goes into the other buffer</p>
+<p data-step="13" class="is-off">Tile 9 (page 9) is read from buffer 1 while tile 10 is copied into buffer 0</p>
+<p data-step="14" class="is-off">Tile 10 (page 9) is read from buffer 0 while tile 11 is copied into buffer 1</p>
+<p data-step="15" class="is-off">Tile 11 (page 9) is read from buffer 1 while tile 12 is copied into buffer 0</p>
+<p data-step="16" class="is-off">Tile 12: <b>page 0</b> begins; only the page table lookup changes. Tile 13 goes into the other buffer</p>
+<p data-step="17" class="is-off">Tile 13 (page 0) is read from buffer 1 while tile 14 is copied into buffer 0</p>
+<p data-step="18" class="is-off">Tile 14 read, tile 15 copied: keys 960–1022 from page 0, <b>K₅, V₅ (key 1023) from attn_in</b></p>
+<p data-step="19" class="is-off">Tile 15: RMSNorm + RoPE on K₅; K₅, V₅ <b>stored to page 0, slot 255</b>; the warps compute</p>
+</div>
 
 <aside class="notes" data-markdown>
-The attention task's counterpart of the linear task's ring slide. Source: `attention_sm100.cuh`.
+Source: `attention_sm100.cuh`.
 No TMA and no producer warp: the 4 warps (128 threads) issue the copies themselves, `load_smem` =
 `cp.async` 16 B per thread (`common/copy_sm80.cuh`), then compute.
 
@@ -353,7 +297,16 @@ the same work as matrices (request 2's 16 query heads; this task's rows are head
 <h1>Merge from registers into GMEM</h1>
 
 <div class="mk" data-mg="flowv"></div>
-<div class="gq-cap" data-mg-cap="flowv"></div>
+<div class="mk-caps" data-mg-cap="flowv">
+<p data-step="0">End of the loop: each warp holds, per Q head, its max(S), ΣP and O_w, in registers</p>
+<p data-step="1" class="is-off"><b>Spill</b>: each warp copies them to SMEM, then a barrier: now every warp can read every partial</p>
+<p data-step="2" class="is-off"><b>Warp 0</b> merges columns 0–31: that band of all 4 partials, and their max(S), ΣP</p>
+<p data-step="3" class="is-off"><b>Warp 1</b> merges columns 32–63: that band of all 4 partials, and their max(S), ΣP</p>
+<p data-step="4" class="is-off"><b>Warp 2</b> merges columns 64–95: that band of all 4 partials, and their max(S), ΣP</p>
+<p data-step="5" class="is-off"><b>Warp 3</b> merges columns 96–127: that band of all 4 partials, and their max(S), ΣP</p>
+<p data-step="6" class="is-off"><b>Store</b>: each warp writes its 2 × 32 values to attn_out (one 2-byte store per thread and row)</p>
+<p data-step="7" class="is-off">Together: KV head 5's 256 columns of token 1023's row, 512 B; then the task's event fires</p>
+</div>
 
 <aside class="notes" data-markdown>
 The end of task (r2, KV 5), `attention_sm100.cuh` after the KV loop. Each warp ends the loop with a
@@ -398,7 +351,21 @@ The 14 padding rows of each m16 tile are merged too but never stored; the O_w va
 <h1>One task/SM per token</h1>
 
 <div class="mk" data-rn="lanes"></div>
-<div class="gq-cap" data-rn-cap="lanes"></div>
+<div class="mk-caps" data-rn-cap="lanes">
+<p data-step="0">Decode batch 8: <b>one task per token</b>, task i owns row i of x and row i of out</p>
+<p data-step="1" class="is-off"><b>Read</b>: task 0 copies <b>row 0</b> of x and <b>all</b> of w, 8 KB</p>
+<p data-step="2" class="is-off"><b>Read</b>: task 1 copies <b>row 1</b> of x and <b>all</b> of w, 8 KB</p>
+<p data-step="3" class="is-off"><b>Read</b>: task 2 copies <b>row 2</b> of x and <b>all</b> of w, 8 KB</p>
+<p data-step="4" class="is-off"><b>Read</b>: task 3 copies <b>row 3</b> of x and <b>all</b> of w, 8 KB</p>
+<p data-step="5" class="is-off"><b>Read</b>: task 4 copies <b>row 4</b> of x and <b>all</b> of w, 8 KB</p>
+<p data-step="6" class="is-off"><b>Read</b>: task 5 copies <b>row 5</b> of x and <b>all</b> of w, 8 KB</p>
+<p data-step="7" class="is-off"><b>Read</b>: task 6 copies <b>row 6</b> of x and <b>all</b> of w, 8 KB</p>
+<p data-step="8" class="is-off"><b>Read</b>: task 7 copies <b>row 7</b> of x and <b>all</b> of w, 8 KB</p>
+<p data-step="9" class="is-off"><b>Read</b>: each task copies <b>its own</b> row of x and the <b>shared</b> row of w, 8 KB</p>
+<p data-step="10" class="is-off"><b>Compute</b>: Σ x², rsqrt(Σ/2048 + ε), scale by w</p>
+<p data-step="11" class="is-off"><b>Write</b>: each task stores its 4 KB row of out</p>
+<p data-step="12" class="is-off"></p>
+</div>
 
 <aside class="notes" data-markdown>
 Qwen3-1.7B decode, batch 8, `rmsnorm_hopper.cuh`: x is 8 × 2048 bf16, w is 2048 bf16, out is
@@ -428,7 +395,33 @@ the slowest is; w is the only shared read, and it comes from L2.
 <h1>All warps, then one warp</h1>
 
 <div class="mk" data-rn="zoom" data-ids="1"></div>
-<div class="rn-cap" data-rn-cap="zoom"></div>
+<div class="mk-caps" data-rn-cap="zoom">
+<p data-step="0"><code>cp.async</code> of 16 B move x and w GMEM → SMEM, bypassing the registers</p>
+<p data-step="1" class="is-off">Sum square per lane</p>
+<p data-step="2" class="is-off">Pairwise sum 16 lanes apart</p>
+<p data-step="3" class="is-off"></p>
+<p data-step="4" class="is-off">Pairwise sum 8 lanes apart</p>
+<p data-step="5" class="is-off"></p>
+<p data-step="6" class="is-off">Pairwise sum 4 lanes apart</p>
+<p data-step="7" class="is-off"></p>
+<p data-step="8" class="is-off">Pairwise sum 2 lanes apart</p>
+<p data-step="9" class="is-off"></p>
+<p data-step="10" class="is-off">Pairwise sum 1 lane apart</p>
+<p data-step="11" class="is-off"></p>
+<p data-step="12" class="is-off">Lane 0 of each warp writes back its partial sum to SMEM</p>
+<p data-step="13" class="is-off">Lanes 0–7 of warp 0 read back the partial sums from SMEM</p>
+<p data-step="14" class="is-off">Pairwise sum 4 lanes apart</p>
+<p data-step="15" class="is-off"></p>
+<p data-step="16" class="is-off">Pairwise sum 2 lanes apart</p>
+<p data-step="17" class="is-off"></p>
+<p data-step="18" class="is-off">Pairwise sum 1 lane apart</p>
+<p data-step="19" class="is-off"></p>
+<p data-step="20" class="is-off">Lane 0 of warp 0 writes back the sum to SMEM</p>
+<p data-step="21" class="is-off">Every lane reads back the sum from SMEM and computes rms_rcp = rsqrt(Σ/2048 + ε)</p>
+<p data-step="22" class="is-off">Every lane of every warp computes out_s = x · rms_rcp · w</p>
+<p data-step="23" class="is-off">Read back the final result into registers and write it back to GMEM</p>
+<p data-step="24" class="is-off"></p>
+</div>
 
 <aside class="notes" data-markdown>
 One task, `rmsnorm_hopper.cuh` with `WORKER_NUM_THREADS = 256` (8 warps) on a 2048-bf16 row.
@@ -495,7 +488,12 @@ labels.
 <h1>48 tasks, one chunk each</h1>
 
 <div class="mk" data-sl="layer"></div>
-<div class="rn-cap" data-sl-cap></div>
+<div class="mk-caps" data-sl-cap>
+<p data-step="0"><b>in</b>: 4 × 12288, <b>48 chunks</b> of 128 gate | 128 up. <b>out</b> = silu(gate) · up: 4 × 6144</p>
+<p data-step="1" class="is-off"><b>Task 0</b> owns chunk 0 of every token in, and the matching 128 columns of out</p>
+<p data-step="2" class="is-off"><b>Task 1</b>: the next chunk, 512 B further along each row</p>
+<p data-step="3" class="is-off"><b>48 tasks</b> on 48 SMs: 2 KB in, 1 KB out each — no overlap, nothing shared</p>
+</div>
 
 <aside class="notes" data-markdown>
 Qwen3-1.7B decode, batch 4, `tasks/ampere/silu_mul.cuh` (the variant used on B200).
@@ -525,7 +523,15 @@ shared, no SMEM.
 <h1>One task: 256 threads, 2 passes</h1>
 
 <div class="mk" data-sl="task"></div>
-<div class="rn-cap" data-sl-cap></div>
+<div class="mk-caps" data-sl-cap>
+<p data-step="0">Task 0's slice: per token 128 gate + 128 up in, 128 out. 256 threads = 8 warps</p>
+<p data-step="1" class="is-off"><b>Pass 0</b> (i = t): warps 0–3 take token 0, warps 4–7 token 1, 32 columns per warp</p>
+<p data-step="2" class="is-off">Warp 0: lane l reads column l of g and of u, 2 B each — <b>64 B</b> per warp, one request</p>
+<p data-step="3" class="is-off">Each lane computes silu(g) · u and stores 2 B: 64 B per warp</p>
+<p data-step="4" class="is-off">Pass 0 done: tokens 0 and 1</p>
+<p data-step="5" class="is-off"><b>Pass 1</b> (i = t + 256): the same warps, same columns, tokens 2 and 3</p>
+<p data-step="6" class="is-off">Each thread handled 2 elements; no SMEM, no synchronisation</p>
+</div>
 
 <aside class="notes" data-markdown>
 Task 0's slice in memory order (g | u per token, then out), cut into 32-column segments. On B200
@@ -566,7 +572,7 @@ registers: no SMEM, no cp.async, no `__syncthreads` inside the task.
 <h1>128 tasks: 16 row blocks × 8 K slices</h1>
 
 <div class="mk" data-sk="layer"></div>
-<div class="sk-caps" data-sk-cap>
+<div class="mk-caps" data-sk-cap>
 <p data-step="0">Split K: 128 tasks, one per A tile</p>
 <p data-step="1" class="is-off">Task (0, 2) reads one cell of A and slice 2 of B, and adds its <b>partial</b> into row block 0 of x</p>
 <p data-step="2" class="is-off">Task (0, 5): same row block of x, its partial adds on top of the first one</p>
@@ -582,7 +588,7 @@ the C = A · B layout: B above x, A to the left of x; K is drawn 1.2 × M, not 3
 `splitk_linear_layer(output=self.x, grid_dim=grid_for_splitk_linear_layer(2048, K))`:
 **16** row blocks of 128 (`MMA_M`) × **8** K slices (the largest s ≤ 128·128 / 2048 with K / s a
 multiple of 64) = **128 tasks**, one per worker. down_proj: K slice 768 = 12 strips of 64; o_proj: 256.
-Cut only by rows, as in the Linear section, there would be 16 tasks of 1.5 MB of weights each.
+Cut only by rows (one task per 128-row MMA tile), there would be 16 tasks of 1.5 MB of weights each.
 
 Each step: one task's cell of A (128 × 768, 192 KB) and K slice of B (768 × 4, 6 KB) read (gold),
 its row block of x written (green, 128 × 4 bf16 = 1 KB); a used cell and its worker go back to the
@@ -591,7 +597,7 @@ complete after its 8th partial. Steps 1–2 are tasks (0, 2) and (0, 5), two par
 row block; step 3 plays the other 126. On the GPU the 128 tasks run at the same time and finish in
 any order.
 
-The task is the Linear section's `linear_sm100_mpk_task_impl` with `SplitK = true`: its epilogue
+The task is `linear_sm100_mpk_task_impl`, the task of every linear layer, with `SplitK = true`: its epilogue
 ends with `tma_reduce_add_async` (`cp.reduce.async.bulk.tensor … .add`) instead of a TMA store.
 PTX: each element-wise add is atomic, `.relaxed.gpu`; the adds are done in the memory system (L2),
 in bf16, in whatever order the tasks finish, so the last bits of x are not reproducible. And x is the
@@ -604,7 +610,7 @@ residual stream: the residual add comes for free.
 <h1>One task: warps and threads</h1>
 
 <div class="mk" data-sk="task"></div>
-<div class="sk-caps" data-sk-cap>
+<div class="mk-caps" data-sk-cap>
 <p data-step="0">Task (0, 2): A and B go through an 8-slot SMEM ring before the tensor core</p>
 <p data-step="1" class="is-off"><b>Warp 5</b>: one lane issues the TMA copy of strip 0 into slot 0</p>
 <p data-step="2" class="is-off"><b>Warp 5</b> keeps going: strips 1–7 fill the ring</p>

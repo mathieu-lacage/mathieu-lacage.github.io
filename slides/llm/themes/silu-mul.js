@@ -74,12 +74,7 @@
       }
       return o;
     };
-    const caps = [
-      '<b>in</b>: 4 tokens × 12288 bf16, laid out as <b>48 chunks</b> of 128 gate | 128 up. <b>out</b> = silu(gate) · up: 4 × 6144',
-      '<b>Task 0</b> owns chunk 0 of every token in, and the matching 128 columns of out',
-      '<b>Task 1</b>: the next chunk, 512 B further along each row',
-      '<b>48 tasks</b> on 48 SMs: 2 KB in, 1 KB out each — no overlap, nothing shared'];
-    return [draw, caps];
+    return draw;
   })();
 
   /* ================= B1: the slice, warp segments, then one warp's lanes ================= */
@@ -144,28 +139,20 @@
       }
       return o;
     };
-    const caps = [
-      'Task 0\'s slice: per token, 128 gate + 128 up columns in, 128 columns out. 256 threads = 8 warps',
-      '<b>Pass 0</b> (i = t): warps 0–3 take token 0, warps 4–7 token 1, 32 columns per warp',
-      'Warp 0: lane l reads column l of g and of u, 2 B each — <b>64 B</b> per warp, one request',
-      'Each lane computes silu(g) · u and stores 2 B: 64 B per warp',
-      'Pass 0 done: tokens 0 and 1',
-      '<b>Pass 1</b> (i = t + 256): the same warps, same columns, tokens 2 and 3',
-      'Each thread handled 2 elements; no SMEM, no synchronisation'];
-    return [draw, caps];
+    return draw;
   })();
 
   const FIGS = { layer: A1, task: B1 };
   document.querySelectorAll('div.mk[data-sl]').forEach((root) => {
-    const [draw, caps] = FIGS[root.dataset.sl];
+    const draw = FIGS[root.dataset.sl];
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 1280 720');
     root.appendChild(svg);
-    const cap = root.parentElement.querySelector('[data-sl-cap]');
-    steps(root, caps.length - 1, (st) => {
-      if (st === null) st = caps.length - 1;
+    const cap = root.parentElement.querySelector('[data-sl-cap]'), n = steps.count(cap) - 1;
+    steps(root, n, (st) => {
+      if (st === null) st = n;
       svg.innerHTML = draw(st);
-      cap.innerHTML = caps[st];
+      steps.caption(cap, st);
     });
   });
 })();

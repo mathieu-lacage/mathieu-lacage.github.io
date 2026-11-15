@@ -44,20 +44,6 @@
   const lerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
   const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
-  const CAPS = [
-    '<b>attn_in</b>, from the QKV linear: request 2\'s new token, one row of 16 Q, 8 K, 8 V heads, grouped by KV head',
-    'Each KV head\'s group goes to <b>its task</b>: 2 Q rows, the new key (end of Kᵀ), the new value (end of V)',
-    'Task (r2, KV 0): its 2 rows of Q read the <b>same 1024 keys</b> (loaded once from the cache), each fills <b>its own row</b> of A',
-    'The 8 tasks run at the same time on 8 SMs, each with its own K, V: <b>16 rows</b>, filled independently',
-    'Each row: softmax over all 1024 keys (no mask at decode: every past key is visible), then O = A V',
-  ];
-  const CAPS_SPD = [
-    'Request 2 decodes 1 token. One layer: <b>8 tasks</b>, one per KV head; each serves <b>2 query heads</b>',
-    'Task (r2, KV 0), per query head: <b>S</b> = q·kᵀ/√d<sub>h</sub>, <b>P</b> = exp(S − m), m the running max, <b>d</b> = Σ P',
-    'The 8 tasks run at the same time on 8 SMs: 16 query heads, each its own S, P, d, filled as the keys stream',
-    'Once all 1024 keys are in: <b>O = (Σ P·V) / d</b>, written once per head',
-  ];
-
   // one task: prog = the share of its keys streamed (0 … 1), lit = not dimmed, split = attn_in has reached it
   const panel = (h, prog, lit, split, detail) => {
     const m = g(h, detail), tile = Math.min(Math.floor(prog * 16), 15), n = Math.floor(prog * NCELL + 1e-6);
@@ -152,11 +138,11 @@
   };
 
   document.querySelectorAll('div.mk[data-mkd="heads"], div.mk[data-mkd="heads-spd"]').forEach((root) => {
-    const detail = root.dataset.mkd === 'heads-spd', caps = detail ? CAPS_SPD : CAPS;
+    const detail = root.dataset.mkd === 'heads-spd';
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 1280 720');
     root.appendChild(svg);
-    const cap = root.parentElement.querySelector(`[data-mkd-cap="${root.dataset.mkd}"]`);
+    const cap = root.parentElement.querySelector(`[data-mkd-cap="${root.dataset.mkd}"]`), n = steps.count(cap) - 1;
     let raf = 0;
     const DUR = 2600, SPEED = [1, 0.93, 1.06, 0.88, 0.97, 1.1, 0.91, 1.02];   // each SM at its own pace
     const all = (v) => Array(NKV).fill(v);
@@ -165,10 +151,10 @@
       const tick = (now) => { const t = Math.min((now - t0) / dur, 1); if (frame(t) !== false && t < 1) raf = requestAnimationFrame(tick); };
       raf = requestAnimationFrame(tick);
     };
-    steps(root, caps.length - 1, (st) => {
+    steps(root, n, (st) => {
       cancelAnimationFrame(raf);
-      if (st === null) st = caps.length - 1;
-      cap.innerHTML = caps[st];
+      if (st === null) st = n;
+      steps.caption(cap, st);
       if (detail) {                                             // empty, task 0, all 8, O
         if (st === 0) return draw(svg, all(0), all(true), 1, true);
         if (st === 1) return play(DUR, (t) => draw(svg, [t, ...all(0).slice(1)], [true, ...all(false).slice(1)], 1, true));

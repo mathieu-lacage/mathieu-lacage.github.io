@@ -174,7 +174,7 @@
     const caps = [...root.querySelectorAll(':scope > p')];
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'), box = document.createElement('div');
     svg.setAttribute('viewBox', '0 0 1280 720');
-    box.className = 'pd-caps';
+    box.className = 'mk-caps';                                 // the deck's caption box (themes/megakernel.css)
     box.append(...caps);
     root.replaceChildren(svg, box);
     let prev = null;

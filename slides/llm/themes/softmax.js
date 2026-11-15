@@ -77,26 +77,17 @@
   };
   // the online steps: one per key; a key that raises the max takes three (new max, rescale, add)
   const SEQ = S.flatMap((v, k) => (k > 0 && v > online(k).m ? ['max', 'rescale', 'add'] : ['one']).map((ph) => ({ k, ph })));
-  const CAP_TWO = ['The same 8 scores, softmaxed two ways',
-    'Textbook: max(S) of the row, exp, ΣP, divide. It needs <b>the whole row</b> before it can start',
-    ...SEQ.map(({ k, ph }) => ({
-      one: k === 0 ? 'Online, key 0: the first max(S); its P is exp(0) = 1' : `Key ${k}: below max(S), its P is added to ΣP. Only max(S) and ΣP are carried to the next key`,
-      max: `Key ${k}: a <b>new max(S)</b>`,
-      rescale: 'Every P so far, and ΣP, used the old max: <b>rescale</b> them by exp(old − new)',
-      add: `Then key ${k}'s own P = 1 is added to ΣP`,
-    }[ph])),
-    'A = P / ΣP: <b>exactly the textbook result</b>, in one pass over the keys'];
 
 
   document.querySelectorAll('div.mk[data-sm="two"]').forEach((root) => {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 1280 720');
     root.appendChild(svg);
-    const cap = root.parentElement.querySelector('[data-sm-cap="two"]');
-    steps(root, CAP_TWO.length - 1, (st) => {
-      if (st === null) st = CAP_TWO.length - 1;
+    const cap = root.parentElement.querySelector('[data-sm-cap="two"]'), n = steps.count(cap) - 1;
+    steps(root, n, (st) => {
+      if (st === null) st = n;
       svg.innerHTML = two(st);
-      cap.innerHTML = CAP_TWO[st];
+      steps.caption(cap, st);
     });
   });
 })();
