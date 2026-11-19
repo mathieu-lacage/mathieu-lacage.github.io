@@ -27,6 +27,10 @@
 //                Two more steps: the up weights before K and V appear, and the regrouping in two
 //                moves, Q first, then K and V rising into the columns. Every head keeps its own
 //                K_h, V_h; c stays next to x, the only thing decode caches
+//   data-sparse  optional, with data-latent: DeepSeek sparse attention, top-k = data-sparse. A third row
+//                after the regrouping: a shadow copy of x, x · [W_IQ | W_IK] = [q^I | k^I] (the lightning
+//                indexer, small heads), then its scores I (n × n), then the top k per row (the others
+//                tinted teal, .ds-drop); every head's attention reads only those keys
 // Its <p> children are the captions, one per step, in order.
 // Positions are slide coordinates (the root sits at 72, 150), as in attention.js; its
 // styles (.at-*) are reused. The attention patterns are illustrative: head 1 reads the
@@ -35,7 +39,7 @@
 (() => {
   const { one, from, parseTokens } = window.AD;
   const OX = 72, OY = 150;                              // the root's position on the slide
-  const COL = { x: '#4aa8ff', q: '#ff9f43', k: '#7cc47a', v: '#d97fd0', z: '#a46cf5', o: '#6d86ff', c: '#f2c14e' };
+  const COL = { i: '#3fc1c9', x: '#4aa8ff', q: '#ff9f43', k: '#7cc47a', v: '#d97fd0', z: '#a46cf5', o: '#6d86ff', c: '#f2c14e' };
   const QKV = [['Q', COL.q], ['K', COL.k], ['V', COL.v]];
 
   // causal attention weights of head k for N tokens: most of each row on one target
@@ -46,17 +50,31 @@
     return Array.from({ length: i + 1 }, (_, j) => (j < lo ? 0 : m === 0 ? 1 : j === t ? 0.75 : 0.25 / m));
   });
 
+  // illustrative indexer scores, causal; the top k is by content, not by position
+  const SCORES = [[0.9], [0.7, 0.5], [0.3, 0.8, 0.6], [0.9, 0.2, 0.4, 0.7], [0.5, 0.9, 0.1, 0.3, 0.6]];
+  const topk = (N, K) => Array.from({ length: N }, (_, i) => {
+    const r = SCORES[i % SCORES.length].slice(0, i + 1);
+    while (r.length < i + 1) r.push(0.2);
+    return new Set(r.map((v, j) => [v, j]).sort((a, b) => b[0] - a[0]).slice(0, K).map(([, j]) => j));
+  });
+  // a head's weights over the selected keys only, renormalized
+  const sparse = (P, S) => P.map((row, i) => {
+    const t = row.reduce((a, v, j) => a + (S[i].has(j) ? v : 0), 0);
+    return row.map((v, j) => (S[i].has(j) ? v / t : 0));
+  });
+
   function build(root) {
     const N = parseTokens(root.dataset.tokens).length, H = +(root.dataset.heads || 4);
     const KV = +(root.dataset.kv || H), R = H / KV;     // R query heads per key / value head
     const Wn = +(root.dataset.window || 0);             // sliding window, 0: none
     const LAT = +(root.dataset.latent || 0);            // latent width in units, 0: none
+    const TK = +(root.dataset.sparse || 0);             // top-k of the indexer, 0: dense
     const heads = Array.from({ length: H }, (_, k) => k), groups = Array.from({ length: KV }, (_, j) => j);
 
     // timeline
     let s = 0;
     const next = () => ++s;
-    const PROJ = next(), UW = LAT ? next() : null, UP = LAT ? next() : null, SLICE = next(), RQ = LAT ? next() : null, REG = next(), ATT = next(), WIN = Wn ? next() : null, ZS = next(), CAT = next(), WO = next();
+    const PROJ = next(), UW = LAT ? next() : null, UP = LAT ? next() : null, SLICE = next(), RQ = LAT ? next() : null, REG = next(), ATT = next(), IDX = TK ? next() : null, SCO = TK ? next() : null, TOP = TK ? next() : null, MSK = TK ? next() : null, WIN = Wn ? next() : null, ZS = next(), CAT = next(), WO = next();
     const SUM = heads.map(next);                        // SUM[k]: head k adds Z_k · W_O^(k) to O
     const FINAL = s;
     const REGQ = LAT ? RQ : REG;                        // Q regrouped (latent: one step before K, V)
@@ -123,6 +141,51 @@
         box('', XC - 4, YP2 - 4, DC + 8, n + 8, { vis: [[UW, REG]], style: `border:2px dashed ${COL.c}; border-radius:4px` }));
     }
 
+    // the lightning indexer, on a third row under x: a shadow x, x · [W_IQ | W_IK] = [q^I | k^I], then I
+    const SEL = TK && topk(N, TK);
+    if (TK) {
+      const YI = YP + n + 148, iu = u, qw = 2 * iu, kw = iu, XI = XX + d + g, XS = XI + qw + g + kw + 24;
+      const y1 = YP + n + 8, y2 = YI - 8, ax = XX + d / 2, vis = [from(IDX)];
+      els.push(box('', ax - 8, y1, 16, y2 - y1, { vis,
+          html: `<svg width="16" height="${y2 - y1}" style="position:absolute;left:0;top:0;overflow:visible">`
+            + `<path d="M8,0 V${y2 - y1 - 1} M2,${y2 - y1 - 9} L8,${y2 - y1 - 1} L14,${y2 - y1 - 9}" fill="none" stroke="${COL.x}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` }),
+        act(XX, YI, d, COL.x, 'x', { vis, hl: [one(IDX)], style: 'filter:brightness(.7) saturate(.7)' }),
+        box('', XX - 4, YI - 4, d + 8, n + 8, { vis, style: `border:2px dashed ${COL.x}; border-radius:4px` }),
+        box('at-w', XI, YI - g - d, qw, d, { vis, hl: [one(IDX)] }, h('div', 'hd-w', { style: `height:${d}px; --hd-c:${COL.i}` })),
+        box('at-w', XI + qw + g, YI - g - d, kw, d, { vis, hl: [one(IDX)] }, h('div', 'hd-w', { style: `height:${d}px; --hd-c:${COL.i}` })),
+        box('hd-name', XI, YI - g - d, qw + g + kw, d, { vis }, name('W<sub>I</sub>', { cls: 'hd-sm' })),
+        act(XI, YI, qw, COL.i, 'q<sup>I</sup>', { vis, hl: [one(IDX)], nm: { cls: 'hd-sm' } }),
+        act(XI + qw + g, YI, kw, COL.i, 'k<sup>I</sup>', { vis, hl: [one(IDX), one(FINAL)], nm: { cls: 'hd-sm' } }));
+      // the scores I, n × n, then the mask M: the top k of each row of I pass (0), the others are −∞ (tinted)
+      const cells = [], mcells = [], XM = XS + n + 56;
+      SEL.forEach((S, i) => SEL.forEach((_, j) => {
+        const pos = `left:${j * u}px; top:${i * u}px; width:${u - 2}px; height:${u - 2}px;`;
+        const sc = j <= i ? (SCORES[i % SCORES.length][j] ?? 0.2) : 0;
+        const a = (v, hl) => h('div', 'at-cell', { style: `${pos} background:rgba(63,193,201,${(0.15 + 0.85 * sc).toFixed(2)})`, vis: v, hl });
+        if (j > i) {
+          cells.push(h('div', 'at-cell at-mask', { style: pos }));
+          mcells.push(h('div', 'at-cell at-mask', { style: pos }));
+        } else if (S.has(j)) {
+          cells.push(a(undefined, [one(TOP)]));
+          mcells.push(h('div', 'at-cell at-empty', { style: pos, hl: [one(TOP)] }));
+        } else {
+          cells.push(a());
+          mcells.push(h('div', 'at-cell at-mask ds-drop', { style: pos }));
+        }
+      }));
+      els.push(box('at-box', XS, YI, n - 2, n - 2, { vis: [from(SCO)], hl: [one(SCO), one(TOP)] }, ...cells, name('I', { cls: 'hd-sm' })),
+        box('at-box', XM, YI, n - 2, n - 2, { vis: [from(TOP)], hl: [one(TOP), one(MSK)] }, ...mcells, name('M', { cls: 'hd-sm' })),
+        box('', XS + n + 6, YI + n / 2 - 8, XM - XS - n - 14, 16, { vis: [from(TOP)],
+          html: `<svg width="${XM - XS - n - 14}" height="16" style="position:absolute;left:0;top:0;overflow:visible">`
+            + `<path d="M0,8 H${XM - XS - n - 15} M${XM - XS - n - 23},2 L${XM - XS - n - 15},8 L${XM - XS - n - 23},14" fill="none" stroke="${COL.i}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
+          h('span', 'at-bl at-bl-bottom', { html: `top ${TK}` })));
+      // the selection goes to every head: a rail under the head names
+      const yr = YI - 16, cx = groups.map((j) => hx(j) + CW / 2), x0 = XM + n / 2;
+      els.push(box('', 0, 0, 1, 1, { vis: [from(MSK)],
+        html: `<svg width="1280" height="720" style="position:absolute;left:${-0}px;top:${-0}px;overflow:visible">`
+          + `<path d="M${x0},${YI - 2} V${yr} M${Math.min(x0, cx[0])},${yr} H${Math.max(x0, cx[KV - 1])} ${cx.map((x) => `M${x},${yr} V${yr - 10} M${x - 5},${yr - 5} L${x},${yr - 10} L${x + 5},${yr - 5}`).join(' ')}" fill="none" stroke="${COL.i}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` }));
+    }
+
     // the H + 2 KV slices: weight slice above its product slice, both move from fused to regrouped
     QKV.forEach(([nm, color], m) => (m ? groups : heads).forEach((k) => {
       const up = LAT && m, end = m ? REG : REGQ;
@@ -153,11 +216,15 @@
 
     // per head, on its row of its column: A_h under Q_h and K, Z_h under V
     heads.forEach((k) => {
-      const P = pattern(k, N), PW = Wn && pattern(k, N, Wn), cells = [], j0 = Math.floor(k / R), rr = Math.floor((k % R) / LN), cc = k % LN;
+      const P = pattern(k, N), PS = TK && sparse(P, SEL), PW = Wn && pattern(k, N, Wn), cells = [], j0 = Math.floor(k / R), rr = Math.floor((k % R) / LN), cc = k % LN;
       P.forEach((row, i) => P.forEach((_, j) => {
         const pos = `left:${j * u}px; top:${i * u}px; width:${u - 2}px; height:${u - 2}px;`;
         const a = (w, vis) => h('div', 'at-cell', { style: `${pos} background:rgba(143,197,250,${(0.15 + 0.85 * w).toFixed(2)})`, vis });
         if (j > i) cells.push(h('div', 'at-cell at-mask', { style: pos }));
+        else if (TK) {  // the dense MLA weights until the mask step, then the masked ones
+          cells.push(a(row[j], [[ATT, MSK]]));
+          cells.push(SEL[i].has(j) ? a(PS[i][j], [from(MSK)]) : h('div', 'at-cell at-mask ds-drop', { style: pos, vis: [from(MSK)] }));
+        }
         else if (!Wn) cells.push(a(row[j]));
         else {  // causal weights until the window step, then the windowed ones, or masked
           cells.push(a(row[j], [[ATT, WIN]]));
@@ -165,7 +232,7 @@
         }
       }));
       const ax = hx(j0) + ((R + 1) * dh + R * sg - LN * n - (LN - 1) * 16) / 2 + cc * (n + 16);  // centred under the Q and K slices
-      els.push(box('at-box', ax, ya(rr), n - 2, n - 2, { vis: [from(ATT)], hl: Wn ? [one(ATT), one(WIN)] : [one(ATT)] },
+      els.push(box('at-box', ax, ya(rr), n - 2, n - 2, { vis: [from(ATT)], hl: [one(ATT), ...(Wn ? [one(WIN)] : []), ...(TK ? [one(MSK)] : [])] },
         ...cells, name(`A<sub>${k + 1}</sub>`, { cls: 'hd-sm' })));
       const z = act(sx(2, j0) + cc * (dh + sg), ya(rr), dh, COL.z, `Z<sub>${k + 1}</sub>`,
         { vis: [from(ZS)], hl: [one(ZS), one(SUM[k])], nm: { cls: 'hd-sm' } });

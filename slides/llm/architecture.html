@@ -202,7 +202,6 @@ Left out of the drawing:
 <p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
 <p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>: same layer, same weights, <strong>only the mask changed</strong></p>
 </div>
-<script src="themes/heads.js"></script>
 
 <aside class="notes" data-markdown>
 Sliding-window attention (Longformer's local attention, Beltagy et al. 2020; Mistral 7B, 2023):
@@ -277,6 +276,60 @@ The band widths in the small masks are schematic.
 Later Mistral models dropped the window (Mistral 7B v0.2: sliding_window null): SWA in every
 layer is the exception today, interleaving is the norm.
 Qwen3-1.7B, local config.json: use_sliding_window false, sliding_window null.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Sparse Multi-Latent Attention</h1>
+
+<div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-latent="4" data-unit="16" data-sparse="2">
+<p>The multi-latent layer again: H = 4 heads. Input <strong>x</strong>: n × d</p>
+<p>One product x · [W<sub>DKV</sub> | W<sub>Q</sub>]: the <strong>latent c</strong>, n × d<sub>c</sub>, and Q</p>
+<p>A copy of c starts a second product, with W<sub>UK</sub> | W<sub>UV</sub> above</p>
+<p>c · [W<sub>UK</sub> | W<sub>UV</sub>] = [K | V]</p>
+<p>Head 1 uses its slice of W<sub>Q</sub>, W<sub>UK</sub> and W<sub>UV</sub></p>
+<p>Regroup Q by head</p>
+<p>Then K and V: as in MLA, every head has its own K<sub>h</sub>, V<sub>h</sub></p>
+<p>Each head computes its MLA attention, as before: A<sub>h</sub> = softmax(Q<sub>h</sub> K<sub>h</sub><sup>T</sup> / √d<sub>h</sub> + causal mask)</p>
+<p>New: a <strong>lightning indexer</strong>, x · W<sub>I</sub> = [q<sup>I</sup> | k<sup>I</sup>]: small query heads, <strong>one small key</strong> per token</p>
+<p>Its scores I<sub>ts</sub> = Σ<sub>j</sub> w<sub>tj</sub> · ReLU(q<sup>I</sup><sub>tj</sub> · k<sup>I</sup><sub>s</sub>): one n × n map, <strong>shared by all heads</strong></p>
+<p>The <strong>top k = 2</strong> of each row of I give a mask <strong>M</strong>: 0 for the kept keys, −∞ for the others</p>
+<p>M masks <strong>every head</strong>: A<sub>h</sub> = softmax(Q<sub>h</sub> K<sub>h</sub><sup>T</sup> / √d<sub>h</sub> + M). « capital » reads « Paris », not « the »</p>
+<p>Z<sub>h</sub> = A<sub>h</sub> · V<sub>h</sub>: each row mixes at most <strong>k rows of V</strong></p>
+<p>From here on, nothing changes: the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
+<p>W<sub>O</sub> is d × d, cut into H row slices</p>
+<p>Head 1 adds Z<sub>1</sub> · W<sub>O</sub><sup>(1)</sup> to O</p>
+<p>Head 2 adds Z<sub>2</sub> · W<sub>O</sub><sup>(2)</sup></p>
+<p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
+<p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>. Decode scans every k<sup>I</sup>, but reads only <strong>k rows of c</strong></p>
+</div>
+<script src="themes/heads.js"></script>
+
+<aside class="notes" data-markdown>
+DeepSeek sparse attention (DSA, DeepSeek-V3.2, 2025; GLM-5.x): MLA, plus a lightning indexer
+that picks, for every query, the k past tokens attention will read. Same weights for Q, K, V,
+same output: only the mask changes, as in SWA, but chosen by content, not by position.
+
+GLM-5.3 (config in mirage/demo/glm53_dsa): 64 heads, d_c = 512 + 64 (RoPE key), indexer of
+32 heads × 128, one key of 128 per token (FP8), top k = 2 048.
+
+Cost at decode, per layer and token, 128 K context: dense MLA reads 128 K × 1 152 B ≈ 151 MB
+of cache; DSA reads all index keys (128 K × 129 B ≈ 16.9 MB) plus 2 048 rows of c (≈ 2.4 MB):
+≈ 19 MB. The indexer is still O(n) per token, but with tiny keys, ReLU and no softmax.
+
+Left out of the drawing:
+- the kernel never computes the masked scores: per query, sparse_mla gathers the k selected
+  rows of c; same result as the mask, cost in k, not n.
+- the indexer query comes from the query latent c_Q (W_IQ: 2 048 → 32 × 128), its key and its
+  weights w from x; the index key has its own LayerNorm and RoPE.
+- GLM-5.3 IndexShare: « shared » layers reuse the top k of the previous « full » layer and run
+  no indexer.
+- Kernels (megakernel deck): dsa_index_score → dsa_index_topk → sparse_mla → dsa_mla_merge.
+- Training (to check): the indexer is first trained to match the dense attention, then the
+  model is trained sparse.
+
+The scores and the selection in the drawing are illustrative.
 </aside>
 </section>
 

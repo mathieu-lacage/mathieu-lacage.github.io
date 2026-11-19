@@ -205,6 +205,14 @@
 .viz[data-anim="heads"] .viz-caps { top: 456px; }
 /* keys dropped by a sliding window (data-window): masked, tinted orange */
 .at-mask.sw-drop { border-color: rgba(255,159,67,.55); background: repeating-linear-gradient(45deg, rgba(255,159,67,.45) 0 2px, rgba(255,159,67,.08) 2px 7px); }
+/* keys the indexer did not select (data-sparse): masked, tinted teal */
+.at-mask.ds-drop { border-color: rgba(63,193,201,.55); background: repeating-linear-gradient(45deg, rgba(63,193,201,.45) 0 2px, rgba(63,193,201,.08) 2px 7px); }
+/* .viz-boxed: the caption box of the other decks (as themes/swa.css), above the footer */
+.viz.viz-boxed .viz-caps { top: 434px; font-size: 23px; }
+.viz.viz-boxed .viz-caps > p {
+  min-height: 58px; line-height: 1.3; box-sizing: border-box;
+  background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-cyan); padding: 12px 22px;
+}
 /* head slices: thin dark cuts between them, outlined when in use */
 .hd-sl { position: absolute; box-sizing: border-box; outline: 3px solid transparent; outline-offset: -3px; }
 .hd-sl.hd-cut { border-left: 2px solid #0f1829; }
