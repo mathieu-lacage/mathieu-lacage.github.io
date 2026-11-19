@@ -388,6 +388,31 @@ The numbers in the drawing are made up, but the recurrence is computed from them
 </section>
 
 <!-- ================================================================ -->
+<section>
+<h1>KDA: State Update</h1>
+
+<div class="viz viz-boxed" data-anim="kda-matrices">
+<p>Eq. 1 is <strong>linear in S</strong>: S<sub>t</sub> = A<sub>t</sub> S<sub>t−1</sub> + B<sub>t</sub>, A<sub>t</sub> and B<sub>t</sub> made from token t alone. d<sub>k</sub> = d<sub>v</sub> = 4</p>
+<p><strong>Erase</strong>: (I − β<sub>t</sub> k<sub>t</sub>k<sub>t</sub><sup>T</sup>) removes a fraction β<sub>t</sub> of what S stores at k<sub>t</sub>.</p>
+<p><strong>Forget</strong>: Diag(α<sub>t</sub>) scales row i of S by α<sub>t,i</sub>. Every read shrinks, most along key channels 2 and 4</p>
+<p><strong>A<sub>t</sub> S<sub>t−1</sub></strong>: the old state, decayed per key channel, with what it stored at k<sub>t</sub> partly erased</p>
+<p><strong>Write</strong>: token t</p>
+</div>
+
+<aside class="notes" data-markdown>
+Eq. 1 read left to right, as written: E_t = I − β_t k_t k_tᵀ, A_t = E_t Diag(α_t), then A_t S_{t−1},
+then + β_t k_t v_tᵀ. Each product A · B = C has A left of C and B above it, as in attention.
+
+The kernels never form A_t (d_k × d_k): they apply it right to left, Diag(α_t) as a row scaling,
+then (I − β_t k_t k_tᵀ) S′ = S′ − β_t k_t (k_tᵀ S′), one read and one outer product, O(d_k d_v).
+Regrouped: S_t = S′ + k_t u_tᵀ, u_t = β_t (v_t − S′ᵀ k_t), the form of the token-by-token animation.
+
+Numbers: tokens 1–3 of the animation give S_{t−1} (themes/kda.js), token 4 is t. S_t here
+equals S_4 there (checked in the script).
+</aside>
+</section>
+
+<!-- ================================================================ -->
 <section class="title">
 <h1>Mixture of Experts</h1>
 </section>
@@ -590,6 +615,7 @@ which is exactly why each sub-layer starts with an input norm.
 
 <script src="themes/heads.js"></script>
 <script src="themes/kda.js"></script>
+<script src="themes/kda-matrices.js"></script>
 <script src="themes/norm.js"></script>
 <script src="themes/swa.js"></script>
 <script src="vendor/reveal/reveal.js"></script>

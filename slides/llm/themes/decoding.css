@@ -239,6 +239,18 @@
 /* ---- kda.js: Kimi Delta Attention (operators and labels between the matrices) ---- */
 .kv-tx { display: flex; align-items: center; justify-content: center; font-size: 26px; color: var(--cutebugs-ink); white-space: nowrap; }
 .kv-tx.kv-dim { color: var(--cutebugs-slate); font-size: 17px; }
+/* ---- kda-matrices.js: eq. 1 as matrices (TeX labels, terms dimmed per step) ---- */
+.ke-tex { text-align: center; font-size: 30px; color: var(--cutebugs-ink); line-height: 1.2; }
+.ke-tex.ke-under { font-size: 20px; }
+.ke-tex.ke-left { text-align: left; }
+.ke-tex.ke-right { text-align: right; }
+.ke-eq mjx-container { margin: 0 !important; }
+.ke-grid { background: #0f1829; }
+.ke-t { transition: opacity .4s ease; }
+.viz[data-anim="kda-matrices"][data-st="1"] :is(.ke-forget, .ke-s, .ke-B),
+.viz[data-anim="kda-matrices"][data-st="2"] :is(.ke-s, .ke-B),
+.viz[data-anim="kda-matrices"][data-st="3"] .ke-B,
+.viz[data-anim="kda-matrices"][data-st="4"] :is(.ke-A, .ke-s) { opacity: .25; }
 /* W_Q^(1): superscript stacked over subscript */
 .hd-ss { display: inline-flex; flex-direction: column; font-size: 62%; line-height: 1; vertical-align: .5em; margin-left: 1px; }
 /* O: one layer per head */
