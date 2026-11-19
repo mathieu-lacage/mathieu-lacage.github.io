@@ -333,6 +333,61 @@ Qwen3-1.7B, local config.json: use_sliding_window false, sliding_window null.
 </section>
 
 <!-- ================================================================ -->
+<section>
+<h1>Kimi Delta Attention</h1>
+
+<div class="viz viz-boxed" data-anim="kda" data-tokens="Paris ␣is ␣the ␣capital">
+<p>One head. Input <strong>x</strong>: n × d, one row per token</p>
+<p>Q, K, V as in attention: x · [W<sub>Q</sub> | W<sub>K</sub> | W<sub>V</sub>]</p>
+<p>Two more: a <strong>decay α</strong> ∈ (0, 1) per key channel, a <strong>write strength β</strong> per token</p>
+<p>A <strong>state S</strong>, d<sub>k</sub> × d<sub>v</sub>, starts <strong>empty</strong>: S<sub>0</sub> = 0</p>
+<p>« Paris »: S<sub>1</sub> = α<sub>1</sub> · S<sub>0</sub> + <strong>k<sub>1</sub> u<sub>1</sub><sup>T</sup></strong>, u<sub>1</sub> = β<sub>1</sub> v<sub>1</sub>: S<sub>0</sub> is empty, nothing to correct</p>
+<p><strong>Query</strong> right away: z<sub>1</sub> = q<sub>1</sub><sup>T</sup> S<sub>1</sub>. « Paris » reads only what it just wrote</p>
+<p>« is »: S<sub>1</sub> <strong>fades</strong>, row i × α<sub>2,i</sub>; u<sub>2</sub> = β<sub>2</sub> (v<sub>2</sub> − what S already stores for k<sub>2</sub>)</p>
+<p>z<sub>2</sub> = q<sub>2</sub><sup>T</sup> S<sub>2</sub>: S<sub>2</sub> holds « Paris » and « is », nothing later</p>
+<p>« the »: S<sub>3</sub> = α<sub>3</sub> · S<sub>2</sub> + k<sub>3</sub> u<sub>3</sub><sup>T</sup></p>
+<p>z<sub>3</sub> = q<sub>3</sub><sup>T</sup> S<sub>3</sub>: each token reads the state <strong>it just wrote</strong>, one row of <strong>Z</strong></p>
+<p>« capital »: S<sub>4</sub>. Each token updates S <strong>once</strong>, in order</p>
+<p>z<sub>4</sub> = q<sub>4</sub><sup>T</sup> S<sub>4</sub>, a mix of the rows of S<sub>4</sub>, weighted by q<sub>4</sub>: Z is complete</p>
+<p>Decode keeps only <strong>S<sub>4</sub></strong>: d<sub>k</sub> × d<sub>v</sub> numbers per head, <strong>whatever n</strong></p>
+</div>
+
+<aside class="notes" data-markdown>
+Kimi Delta Attention (KDA, Moonshot, « Kimi Linear », 2025): a linear-attention layer,
+gated delta rule with a per-channel decay. One recurrence per head, S ∈ ℝ^(d_k × d_v):
+
+    S_t = (I − β_t k_t k_tᵀ) Diag(α_t) S_{t−1} + β_t k_t v_tᵀ,   z_t = S_tᵀ q_t
+
+the update of the drawing: decay by α_t, then add k_t u_tᵀ, u_t = β_t (v_t − k_tᵀ Diag(α_t) S_{t−1}),
+the part of v_t that S does not already return for k_t. Without the decay (α = 1)
+it is DeltaNet; with one α per head (a scalar) Gated DeltaNet; KDA gives every key channel
+its own α (« fine-grained gating »). Why the delta rule: plain linear attention only adds
+k vᵀ, so S fills up; here the write first removes what k_t already retrieved.
+
+What S replaces: the n × n scores and the KV cache. Prefill is not run token by token: the
+chunked form (64 tokens per chunk) turns the recurrence into matrix products inside a chunk
+and passes S between chunks (fla: chunk_kda; decode: fused_recurrent_kda).
+
+Left out of the drawing:
+- q, k, v go through a short causal depthwise conv (kernel 4) and SiLU; q, k are L2-normalized.
+- α and the output gate come from low-rank projections (d → 128 → H·d_k); β = sigmoid(x W_β),
+  one per head. GLM-5.3-Flash: α = exp(−5 · sigmoid(…)), in (e^−5, 1).
+- No RoPE: the decay already tells positions apart.
+- Hybrid models: Kimi Linear 3 KDA layers for 1 MLA layer; GLM-5.3-Flash 3 KDA for 1 DSA
+  (notes/glm53-option-a-a2a-kda-math.md).
+
+GLM-5.3-Flash: 64 heads, d_k = d_v = 128: S = 64 · 128 · 128 = 1 M numbers per layer (4 MB
+in fp32), the same at 1 K or 1 M tokens of context.
+
+Each z_t is read right after S_t is written (causal). One head drawn: every head has its own
+slices of the W and its own S_h; the Z_h go through a gated RMSNorm, are concatenated, then
+O = Z · W_O, as in attention.
+
+The numbers in the drawing are made up, but the recurrence is computed from them.
+</aside>
+</section>
+
+<!-- ================================================================ -->
 <section class="title">
 <h1>Mixture of Experts</h1>
 </section>
@@ -534,6 +589,7 @@ which is exactly why each sub-layer starts with an input norm.
 </div>
 
 <script src="themes/heads.js"></script>
+<script src="themes/kda.js"></script>
 <script src="themes/norm.js"></script>
 <script src="themes/swa.js"></script>
 <script src="vendor/reveal/reveal.js"></script>

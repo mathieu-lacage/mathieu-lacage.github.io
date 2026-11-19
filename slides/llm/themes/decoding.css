@@ -236,6 +236,9 @@
 .at-box.hd-in.is-hl::after { border-color: var(--cutebugs-red); }
 .hd-mv.viz-v { transition: opacity .5s ease, translate .9s cubic-bezier(.6, .05, .3, 1); }
 .at-nm.hd-sm { font-size: 17px; }
+/* ---- kda.js: Kimi Delta Attention (operators and labels between the matrices) ---- */
+.kv-tx { display: flex; align-items: center; justify-content: center; font-size: 26px; color: var(--cutebugs-ink); white-space: nowrap; }
+.kv-tx.kv-dim { color: var(--cutebugs-slate); font-size: 17px; }
 /* W_Q^(1): superscript stacked over subscript */
 .hd-ss { display: inline-flex; flex-direction: column; font-size: 62%; line-height: 1; vertical-align: .5em; margin-left: 1px; }
 /* O: one layer per head */
