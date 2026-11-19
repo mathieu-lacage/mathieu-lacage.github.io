@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="themes/decoding.css">
 <link rel="stylesheet" href="themes/ffn.css">
 <link rel="stylesheet" href="themes/norm.css">
+<link rel="stylesheet" href="themes/swa.css">
 <script>
 window.MathJax = {
   tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
@@ -130,13 +131,109 @@ halving the KV heads halves the cache, at a small cost in quality.
 <p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
 <p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>: <strong>O</strong> = Z · W<sub>O</sub>, n × d, as in multi-head attention</p>
 </div>
-<script src="themes/heads.js"></script>
 
 <aside class="notes" data-markdown>
 Multi-query attention (MQA, Shazeer 2019, « One Write-Head is All You Need »): GQA with
 n_kv = 1. The KV cache shrinks by H (here 4, often 32 or more in real models), which is what
 decode is bound by. The cost is quality and training stability, hence GQA as the middle ground
 (Ainslie et al. 2023 convert MHA checkpoints to GQA). Used by PaLM, Falcon-7B, StarCoder.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Sliding-Window Attention</h1>
+
+<div class="viz" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="1" data-window="2">
+<p>The layer of the previous slide: H = 4 query heads, one key / value head. Input <strong>x</strong>: n × d</p>
+<p>One product computes Q, K and V: x · [W<sub>Q</sub> | W<sub>K</sub> | W<sub>V</sub>]</p>
+<p>Head 1 uses its slice of W<sub>Q</sub>, and the only slice of W<sub>K</sub> and W<sub>V</sub></p>
+<p>Regroup by key / value head: all 4 query heads share K and V</p>
+<p>Each head's attention A<sub>h</sub>, with the causal mask: query i reads <strong>every key j ≤ i</strong></p>
+<p>Sliding window, <strong>W = 2</strong>: query i reads only keys i − W &lt; j ≤ i; the rest is <strong>masked</strong></p>
+<p>Z<sub>h</sub> = A<sub>h</sub> · V: each row mixes at most <strong>W rows of V</strong>; older rows of K and V are never read</p>
+<p>From here on, nothing changes: the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
+<p>W<sub>O</sub> is d × d, cut into H row slices</p>
+<p>Head 1 adds Z<sub>1</sub> · W<sub>O</sub><sup>(1)</sup> to O</p>
+<p>Head 2 adds Z<sub>2</sub> · W<sub>O</sub><sup>(2)</sup></p>
+<p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
+<p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>: same layer, same weights, <strong>only the mask changed</strong></p>
+</div>
+<script src="themes/heads.js"></script>
+
+<aside class="notes" data-markdown>
+Sliding-window attention (Longformer's local attention, Beltagy et al. 2020; Mistral 7B, 2023):
+M_ij = −∞ also when j ≤ i − W. Shown here on the MQA layer, but the window is independent of
+the number of KV heads (Mistral 7B: GQA, 8 KV heads, W = 4 096).
+
+Head 2 read the first token: out of the window, its weight moves to its neighbours
+(illustrative pattern, renormalized). That first token is often an attention sink
+(inference.html, data/trace-Qwen3-1.7B-sink.json): StreamingLLM (Xiao et al. 2023) keeps the
+first few tokens on top of the window for that reason. A model trained with full attention
+(Qwen3) cannot just be given a window: SWA is a training-time choice.
+
+« Does « capital » never see « Paris »? »: it does, through the layers. Each layer extends the
+reach by W − 1 positions: after L layers, L · (W − 1) + 1. Mistral 7B: 32 layers × 4 096 ≈ 131 K
+tokens. Reach is not recall: information diluted over many hops, hence the global layers of
+the « Local and global layers » slide.
+
+Cost: the scores drop from ≈ n² / 2 to n · W, but only if the kernel skips the masked tiles
+(FlashAttention skips blocks that are entirely masked); a plain masked softmax still computes
+all n² scores and throws most of them away.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>A KV cache that stops growing</h1>
+
+<div class="swa" data-swa="cache" data-window="2">
+<p>Decoding « The »: its K and V go into <strong>both caches</strong></p>
+<p>« city »: one more entry in each cache; the window cache is <strong>full</strong>, its 2 slots used</p>
+<p>« of »: overwrite the oldest slot. « The » is out of the window, <strong>its K and V are dropped</strong></p>
+<p>« Paris » overwrites « city »: slot = position mod W, a <strong>ring buffer</strong></p>
+<p>« is »: the full cache holds 5 entries, the window cache still 2</p>
+<p>« the »: same, the window slides one token</p>
+<p>« capital »: the full cache holds 7 entries</p>
+<p>« of »: the full cache grows with n, the window cache <strong>stays at W</strong></p>
+<p>Mistral 7B at a 32 K context: <strong>4 GiB</strong> of KV cache per sequence, <strong>0.5 GiB</strong> with W = 4 096</p>
+</div>
+
+<aside class="notes" data-markdown>
+The rolling buffer cache of the Mistral 7B paper: position i is stored in slot i mod W.
+Memory, and the bytes read per decoded token, stop growing with the context: decode is
+memory bound (roofline, « Inference »), so this is where SWA pays.
+
+Mistral 7B: 32 layers × 8 KV heads × d_h = 128 × 2 (K, V) × 2 bytes (bf16) = 128 KiB per token;
+× 32 768 tokens = 4 GiB, × 4 096 = 0.5 GiB per sequence.
+
+With paged attention (« Inference »), the same idea frees the pages that slid out of the window.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Local and global layers</h1>
+
+<div class="swa" data-swa="layers">
+<p>Mistral 7B: <strong>every layer</strong> is a sliding window, W = 4 096</p>
+<p>KV cache capped at W per layer: <strong>12.5 %</strong> of full attention at 32 K</p>
+<p>Gemma 2: alternate <strong>local</strong> and <strong>global</strong> layers, 1 : 1</p>
+<p>Gemma 3: <strong>5 local</strong> layers (W = 1 024) for each global one</p>
+<p>gpt-oss: alternates global layers and <strong>W = 128</strong> local layers</p>
+<p>Qwen3-1.7B: <strong>global in all 28 layers</strong>, its KV cache grows with n</p>
+</div>
+
+<aside class="notes" data-markdown>
+KV cache at a 32 K context relative to all-global layers, same context for every model
+for the comparison (Gemma 2 is trained at 8 K):
+Mistral 7B 4 096 / 32 768 = 12.5 %; Gemma 2 (4 096 + 32 768) / 2 = 56 %;
+Gemma 3 (5 × 1 024 + 32 768) / 6 = 19 %; gpt-oss (128 + 32 768) / 2 = 50 %.
+The band widths in the small masks are schematic.
+
+Later Mistral models dropped the window (Mistral 7B v0.2: sliding_window null): SWA in every
+layer is the exception today, interleaving is the norm.
+Qwen3-1.7B, local config.json: use_sliding_window false, sliding_window null.
 </aside>
 </section>
 
@@ -342,6 +439,7 @@ which is exactly why each sub-layer starts with an input norm.
 </div>
 
 <script src="themes/norm.js"></script>
+<script src="themes/swa.js"></script>
 <script src="vendor/reveal/reveal.js"></script>
 <script src="vendor/reveal/notes.js"></script>
 <script src="themes/deck.js"></script>

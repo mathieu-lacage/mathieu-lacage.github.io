@@ -203,6 +203,8 @@
 
 /* ---- heads.js: H heads cut out of one projection (reuses the attention.js styles) ---- */
 .viz[data-anim="heads"] .viz-caps { top: 456px; }
+/* keys dropped by a sliding window (data-window): masked, tinted orange */
+.at-mask.sw-drop { border-color: rgba(255,159,67,.55); background: repeating-linear-gradient(45deg, rgba(255,159,67,.45) 0 2px, rgba(255,159,67,.08) 2px 7px); }
 /* head slices: thin dark cuts between them, outlined when in use */
 .hd-sl { position: absolute; box-sizing: border-box; outline: 3px solid transparent; outline-offset: -3px; }
 .hd-sl.hd-cut { border-left: 2px solid #0f1829; }

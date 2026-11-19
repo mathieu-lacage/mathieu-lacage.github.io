@@ -18,6 +18,9 @@
 //                its K and V: one row A_h, Z_h per query head, Z_h under the shared V (two per
 //                row when a group holds more than 2 query heads, e.g. data-kv="1")
 //   data-unit    pixels per unit: n = N, d_h = 2 and d = H · d_h units (18)
+//   data-window  optional, a sliding window W: one more step right after the attention
+//                step, where every key j <= i - W of the A_h turns masked (tinted, .sw-drop)
+//                and the head patterns are renormalized over the window
 // Its <p> children are the captions, one per step, in order.
 // Positions are slide coordinates (the root sits at 72, 150), as in attention.js; its
 // styles (.at-*) are reused. The attention patterns are illustrative: head 1 reads the
@@ -30,20 +33,23 @@
   const QKV = [['Q', COL.q], ['K', COL.k], ['V', COL.v]];
 
   // causal attention weights of head k for N tokens: most of each row on one target
-  const pattern = (k, N) => Array.from({ length: N }, (_, i) => {
-    const t = [Math.max(i - 1, 0), 0, i, Math.max(i - 2, 0)][k % 4];
-    return Array.from({ length: i + 1 }, (_, j) => (i === 0 ? 1 : j === t ? 0.75 : 0.25 / i));
+  // with a window Wn, only keys i - Wn < j <= i: the target moves into the window, renormalized
+  const pattern = (k, N, Wn = N) => Array.from({ length: N }, (_, i) => {
+    const lo = Math.max(0, i - Wn + 1), m = i - lo;   // m + 1 keys in the window
+    const t = Math.max(lo, [Math.max(i - 1, 0), 0, i, Math.max(i - 2, 0)][k % 4]);
+    return Array.from({ length: i + 1 }, (_, j) => (j < lo ? 0 : m === 0 ? 1 : j === t ? 0.75 : 0.25 / m));
   });
 
   function build(root) {
     const N = parseTokens(root.dataset.tokens).length, H = +(root.dataset.heads || 4);
     const KV = +(root.dataset.kv || H), R = H / KV;     // R query heads per key / value head
+    const Wn = +(root.dataset.window || 0);             // sliding window, 0: none
     const heads = Array.from({ length: H }, (_, k) => k), groups = Array.from({ length: KV }, (_, j) => j);
 
     // timeline
     let s = 0;
     const next = () => ++s;
-    const PROJ = next(), SLICE = next(), REG = next(), ATT = next(), ZS = next(), CAT = next(), WO = next();
+    const PROJ = next(), SLICE = next(), REG = next(), ATT = next(), WIN = Wn ? next() : null, ZS = next(), CAT = next(), WO = next();
     const SUM = heads.map(next);                        // SUM[k]: head k adds Z_k · W_O^(k) to O
     const FINAL = s;
 
@@ -115,14 +121,19 @@
 
     // per head, on its row of its column: A_h under Q_h and K, Z_h under V
     heads.forEach((k) => {
-      const P = pattern(k, N), cells = [], j0 = Math.floor(k / R), rr = Math.floor((k % R) / LN), cc = k % LN;
+      const P = pattern(k, N), PW = Wn && pattern(k, N, Wn), cells = [], j0 = Math.floor(k / R), rr = Math.floor((k % R) / LN), cc = k % LN;
       P.forEach((row, i) => P.forEach((_, j) => {
         const pos = `left:${j * u}px; top:${i * u}px; width:${u - 2}px; height:${u - 2}px;`;
-        cells.push(j > i ? h('div', 'at-cell at-mask', { style: pos })
-          : h('div', 'at-cell', { style: `${pos} background:rgba(143,197,250,${(0.15 + 0.85 * row[j]).toFixed(2)})` }));
+        const a = (w, vis) => h('div', 'at-cell', { style: `${pos} background:rgba(143,197,250,${(0.15 + 0.85 * w).toFixed(2)})`, vis });
+        if (j > i) cells.push(h('div', 'at-cell at-mask', { style: pos }));
+        else if (!Wn) cells.push(a(row[j]));
+        else {  // causal weights until the window step, then the windowed ones, or masked
+          cells.push(a(row[j], [[ATT, WIN]]));
+          cells.push(j <= i - Wn ? h('div', 'at-cell at-mask sw-drop', { style: pos, vis: [from(WIN)] }) : a(PW[i][j], [from(WIN)]));
+        }
       }));
       const ax = hx(j0) + ((R + 1) * dh + R * sg - LN * n - (LN - 1) * 16) / 2 + cc * (n + 16);  // centred under the Q and K slices
-      els.push(box('at-box', ax, ya(rr), n - 2, n - 2, { vis: [from(ATT)], hl: [one(ATT)] },
+      els.push(box('at-box', ax, ya(rr), n - 2, n - 2, { vis: [from(ATT)], hl: Wn ? [one(ATT), one(WIN)] : [one(ATT)] },
         ...cells, name(`A<sub>${k + 1}</sub>`, { cls: 'hd-sm' })));
       const z = act(sx(2, j0) + cc * (dh + sg), ya(rr), dh, COL.z, `Z<sub>${k + 1}</sub>`,
         { vis: [from(ZS)], hl: [one(ZS), one(SUM[k])], nm: { cls: 'hd-sm' } });
