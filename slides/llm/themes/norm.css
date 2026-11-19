@@ -7,9 +7,10 @@
 .norm-caps { position: absolute; left: 72px; right: 72px; top: 584px; display: grid; }
 .norm-caps > p {
   grid-area: 1 / 1; margin: 0 !important; min-height: 58px; font-size: 23px; line-height: 1.3; box-sizing: border-box;
-  background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-cyan); padding: 12px 22px;
+  background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-blue); padding: 12px 22px;
 }
 .norm-caps > p.is-off { visibility: hidden; }
+.norm-caps :is(sub, sup) { line-height: 0; }  /* keep the box one line high */
 
 /* steps: hidden elements; animations replayed on entering their step (class play) */
 .norm [data-s], .norm [data-e] { transition: opacity .35s; }

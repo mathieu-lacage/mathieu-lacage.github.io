@@ -41,7 +41,7 @@ window.MathJax = {
 <section>
 <h1>Multi-Head Attention</h1>
 
-<div class="viz" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4">
+<div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4">
 <p>A layer runs <strong>H heads</strong> side by side, here H = 4. Input <strong>x</strong>: n × d, with d = H · d<sub>h</sub></p>
 <p>One product computes Q, K and V: x · [W<sub>Q</sub> | W<sub>K</sub> | W<sub>V</sub>], each W is d × d</p>
 <p>Head 1 only uses its <strong>column slice</strong> of each W: d × d<sub>h</sub>, as on the previous slide</p>
@@ -89,12 +89,12 @@ window.MathJax = {
 <section>
 <h1>Grouped-Query Attention</h1>
 
-<div class="viz" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="2">
+<div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="2" data-unit="15">
 <p>Same layer, H = 4 query heads, but only <strong>n<sub>kv</sub> = 2</strong> key / value heads</p>
 <p>W<sub>Q</sub> is still d × d, but W<sub>K</sub> and W<sub>V</sub> are only d × n<sub>kv</sub> d<sub>h</sub>: fewer weights, smaller K and V</p>
 <p>Head 1 uses its slice of W<sub>Q</sub>, and slice 1 of W<sub>K</sub> and W<sub>V</sub></p>
 <p>Regroup by <strong>key / value head</strong>: heads 1 and 2 share K<sub>1</sub>, V<sub>1</sub>; heads 3 and 4 share K<sub>2</sub>, V<sub>2</sub></p>
-<p>Each query head still has its own <strong>attention</strong>: A<sub>1</sub> = softmax(Q<sub>1</sub> K<sub>1</sub><sup>T</sup> …), A<sub>2</sub> = softmax(Q<sub>2</sub> K<sub>1</sub><sup>T</sup> …): same keys, different queries</p>
+<p>Each query head has its own <strong>attention</strong>: A<sub>1</sub> = softmax(Q<sub>1</sub> K<sub>1</sub><sup>T</sup> …), A<sub>2</sub> = softmax(Q<sub>2</sub> K<sub>1</sub><sup>T</sup> …)</p>
 <p>Z<sub>1</sub> = A<sub>1</sub> · V<sub>1</sub> and Z<sub>2</sub> = A<sub>2</sub> · V<sub>1</sub>: the same values, mixed differently</p>
 <p>From here on, nothing changes: the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
 <p>W<sub>O</sub> is d × d, cut into H row slices</p>
@@ -117,12 +117,12 @@ halving the KV heads halves the cache, at a small cost in quality.
 <section>
 <h1>Multi-Query Attention</h1>
 
-<div class="viz" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="1">
+<div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="1" data-unit="15">
 <p>Same layer, H = 4 query heads, but a <strong>single</strong> key / value head: <strong>n<sub>kv</sub> = 1</strong></p>
 <p>W<sub>Q</sub> is still d × d, but W<sub>K</sub> and W<sub>V</sub> are only d × d<sub>h</sub>: <strong>one slice</strong> each</p>
 <p>Head 1 uses its slice of W<sub>Q</sub>, and the only slice of W<sub>K</sub> and W<sub>V</sub></p>
 <p>Regroup by key / value head: there is only one, so <strong>all 4 query heads</strong> share K and V</p>
-<p>Each query head still has its own <strong>attention</strong>: A<sub>h</sub> = softmax(Q<sub>h</sub> K<sup>T</sup> …): one set of keys, 4 different queries</p>
+<p>Each query head has its own <strong>attention</strong>: A<sub>h</sub> = softmax(Q<sub>h</sub> K<sup>T</sup> …): one set of keys, 4 queries</p>
 <p>Z<sub>h</sub> = A<sub>h</sub> · V: the same values, mixed 4 different ways</p>
 <p>From here on, nothing changes: the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
 <p>W<sub>O</sub> is d × d, cut into H row slices</p>
@@ -144,7 +144,7 @@ decode is bound by. The cost is quality and training stability, hence GQA as the
 <section>
 <h1>Multi-Latent Attention</h1>
 
-<div class="viz" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-latent="4" data-unit="16">
+<div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-latent="4" data-unit="16">
 <p>The multi-head layer again: H = 4 heads. Input <strong>x</strong>: n × d</p>
 <p>One product x · [W<sub>DKV</sub> | W<sub>Q</sub>]: a narrow <strong>latent c</strong>, n × d<sub>c</sub>, and Q</p>
 <p>A copy of c starts a <strong>second product</strong>, with W<sub>UK</sub> | W<sub>UV</sub> above: short weights, d<sub>c</sub> × d</p>
@@ -187,7 +187,7 @@ Left out of the drawing:
 <section>
 <h1>Sliding-Window Attention</h1>
 
-<div class="viz" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="1" data-window="2">
+<div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="1" data-window="2" data-unit="15">
 <p>The multi-query layer: H = 4 query heads, one key / value head. Input <strong>x</strong>: n × d</p>
 <p>One product computes Q, K and V: x · [W<sub>Q</sub> | W<sub>K</sub> | W<sub>V</sub>]</p>
 <p>Head 1 uses its slice of W<sub>Q</sub>, and the only slice of W<sub>K</sub> and W<sub>V</sub></p>
