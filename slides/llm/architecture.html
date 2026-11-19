@@ -142,10 +142,53 @@ decode is bound by. The cost is quality and training stability, hence GQA as the
 
 <!-- ================================================================ -->
 <section>
+<h1>Multi-Latent Attention</h1>
+
+<div class="viz" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-latent="4" data-unit="16">
+<p>The multi-head layer again: H = 4 heads. Input <strong>x</strong>: n × d</p>
+<p>One product x · [W<sub>DKV</sub> | W<sub>Q</sub>]: a narrow <strong>latent c</strong>, n × d<sub>c</sub>, and Q</p>
+<p>A copy of c starts a <strong>second product</strong>, with W<sub>UK</sub> | W<sub>UV</sub> above: short weights, d<sub>c</sub> × d</p>
+<p><strong>c · [W<sub>UK</sub> | W<sub>UV</sub>] = [K | V]</strong>, laid out like x · W<sub>Q</sub> = Q</p>
+<p>Head 1 uses its slice of W<sub>Q</sub>, W<sub>UK</sub> and W<sub>UV</sub></p>
+<p>Regroup Q by head: Q<sub>h</sub> moves into the column of head h</p>
+<p>Then K and V: K<sub>h</sub>, V<sub>h</sub> rise next to Q<sub>h</sub>, <strong>own</strong> per head, as in multi-head attention</p>
+<p>Each head's attention A<sub>h</sub> = softmax(Q<sub>h</sub> K<sub>h</sub><sup>T</sup> / √d<sub>h</sub> + M)</p>
+<p>Z<sub>h</sub> = A<sub>h</sub> · V<sub>h</sub></p>
+<p>From here on, nothing changes: the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
+<p>W<sub>O</sub> is d × d, cut into H row slices</p>
+<p>Head 1 adds Z<sub>1</sub> · W<sub>O</sub><sup>(1)</sup> to O</p>
+<p>Head 2 adds Z<sub>2</sub> · W<sub>O</sub><sup>(2)</sup></p>
+<p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
+<p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>. Decode caches <strong>only c</strong>: d<sub>c</sub> numbers per token, not 2 d</p>
+</div>
+
+<aside class="notes" data-markdown>
+Multi-head latent attention (MLA, DeepSeek-V2, 2024; kept in DeepSeek-V3/R1, Kimi K2):
+W_K = W_DKV · W_UK and W_V = W_DKV · W_UV, through a latent of width d_c ≪ d. GQA / MQA
+shrink the cache with fewer copies (heads share K, V); MLA with fewer numbers: every head
+keeps its own K_h, V_h, but all are rebuilt from the same c, which is all the cache holds.
+
+DeepSeek-V3: d = 7 168, 128 heads of d_h = 128, d_c = 512. Per token per layer, K and V:
+MHA 2 · 128 · 128 = 32 768 numbers, GQA with 8 groups 2 048, MQA 256, MLA 512 + 64 = 576
+(the 64: the RoPE key, below). DeepSeek-V2 reports MLA above MHA in quality (their
+ablation, appendix D). In the drawing, d = 8 units, d_h = 2, d_c = 4 (2 d_h; DeepSeek: 4 d_h).
+
+Left out of the drawing:
+- Absorption, at decode: q_h · (c W_UK)ᵀ = (q_h W_UKᵀ) · cᵀ, so W_UK moves onto the query and
+  K is never built; all heads then read the same cache of c: at decode, MLA is MQA with keys
+  of width d_c (FlashMLA). Likewise W_UV folds into W_O.
+- RoPE does not commute with W_UK (the rotation depends on the position): a small decoupled
+  key k_R = RoPE(x · W_KR), d_R = 64, shared by all heads and cached next to c.
+- The query side is low-rank too in DeepSeek (c_Q, 1 536 wide): saves parameters, not cache.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
 <h1>Sliding-Window Attention</h1>
 
 <div class="viz" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="1" data-window="2">
-<p>The layer of the previous slide: H = 4 query heads, one key / value head. Input <strong>x</strong>: n × d</p>
+<p>The multi-query layer: H = 4 query heads, one key / value head. Input <strong>x</strong>: n × d</p>
 <p>One product computes Q, K and V: x · [W<sub>Q</sub> | W<sub>K</sub> | W<sub>V</sub>]</p>
 <p>Head 1 uses its slice of W<sub>Q</sub>, and the only slice of W<sub>K</sub> and W<sub>V</sub></p>
 <p>Regroup by key / value head: all 4 query heads share K and V</p>

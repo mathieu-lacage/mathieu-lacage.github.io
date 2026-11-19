@@ -21,6 +21,12 @@
 //   data-window  optional, a sliding window W: one more step right after the attention
 //                step, where every key j <= i - W of the A_h turns masked (tinted, .sw-drop)
 //                and the head patterns are renormalized over the window
+//   data-latent  optional, multi-latent attention with a latent of that many units (d_c = units · u):
+//                x · [W_DKV | W_Q] = [c | Q] on the first row; a shadow copy of c (an arrow from c)
+//                starts a second row, c · [W_UK | W_UV] = [K | V], the up weights only d_c tall.
+//                Two more steps: the up weights before K and V appear, and the regrouping in two
+//                moves, Q first, then K and V rising into the columns. Every head keeps its own
+//                K_h, V_h; c stays next to x, the only thing decode caches
 // Its <p> children are the captions, one per step, in order.
 // Positions are slide coordinates (the root sits at 72, 150), as in attention.js; its
 // styles (.at-*) are reused. The attention patterns are illustrative: head 1 reads the
@@ -29,7 +35,7 @@
 (() => {
   const { one, from, parseTokens } = window.AD;
   const OX = 72, OY = 150;                              // the root's position on the slide
-  const COL = { x: '#4aa8ff', q: '#ff9f43', k: '#7cc47a', v: '#d97fd0', z: '#a46cf5', o: '#6d86ff' };
+  const COL = { x: '#4aa8ff', q: '#ff9f43', k: '#7cc47a', v: '#d97fd0', z: '#a46cf5', o: '#6d86ff', c: '#f2c14e' };
   const QKV = [['Q', COL.q], ['K', COL.k], ['V', COL.v]];
 
   // causal attention weights of head k for N tokens: most of each row on one target
@@ -44,14 +50,16 @@
     const N = parseTokens(root.dataset.tokens).length, H = +(root.dataset.heads || 4);
     const KV = +(root.dataset.kv || H), R = H / KV;     // R query heads per key / value head
     const Wn = +(root.dataset.window || 0);             // sliding window, 0: none
+    const LAT = +(root.dataset.latent || 0);            // latent width in units, 0: none
     const heads = Array.from({ length: H }, (_, k) => k), groups = Array.from({ length: KV }, (_, j) => j);
 
     // timeline
     let s = 0;
     const next = () => ++s;
-    const PROJ = next(), SLICE = next(), REG = next(), ATT = next(), WIN = Wn ? next() : null, ZS = next(), CAT = next(), WO = next();
+    const PROJ = next(), UW = LAT ? next() : null, UP = LAT ? next() : null, SLICE = next(), RQ = LAT ? next() : null, REG = next(), ATT = next(), WIN = Wn ? next() : null, ZS = next(), CAT = next(), WO = next();
     const SUM = heads.map(next);                        // SUM[k]: head k adds Z_k · W_O^(k) to O
     const FINAL = s;
+    const REGQ = LAT ? RQ : REG;                        // Q regrouped (latent: one step before K, V)
 
     // geometry
     const u = +(root.dataset.unit || 18), n = N * u, dh = 2 * u, d = H * dh, dk = KV * dh, g = 10, sg = 6;
@@ -59,10 +67,17 @@
     const ya = (r) => YA + r * (n + 16);                 // row of the r-th query head of a column
     // more than 2 query heads per column (multi-query attention): 2 per row, or they run off the slide
     const LN = R > 2 ? 2 : 1, RW = Math.ceil(R / LN);    // lanes, rows per column
+    const DC = LAT * u, XC = XX + d + 20;               // the latent c and W_DKV, right of x
+    const BASE = LAT ? XC + DC + 20 : 250;              // left edge of the head columns
+    const wh = (m) => (LAT && m ? DC : d);              // height of W_m: W_UK, W_UV are only d_c tall
+    const YP2 = YP + n + g + DC + 50;                   // latent: the row of c · [W_UK | W_UV]
     const W = [d, dk, dk];                               // widths of W_Q, W_K, W_V
-    const fx = (m, k) => 250 + (m > 0) * (d + g) + (m > 1) * (dk + g) + k * dh;  // slice k of W_m, side by side (one product)
+    const fx = (m, k) => BASE + (m > 0) * (d + g) + (m > 1) * (dk + g) + k * dh;  // slice k of W_m, side by side (one product)
+    // latent: slice k of W_m before regrouping, Q right of c, K and V on the second row
+    const fxF = (m, k) => (LAT ? XC + DC + g + (m > 1) * (dk + g) + k * dh : fx(m, k));
+    const fyF = (m) => (LAT && m ? YP2 - YP : 0);
     const CW = (R + 2) * dh + (R + 1) * sg + (LN - 1) * (dh + sg);  // R query slices, K and V, room for the 2nd lane of Z
-    const hx = (j) => 250 + j * (CW + 36);               // column j, of key / value head j
+    const hx = (j) => BASE + j * (CW + 36);               // column j, of key / value head j
     const slot = (m, k) => (m ? R - 1 + m : k % R);      // slice k of W_m, its place in its column
     const sx = (m, k) => hx(m ? k : Math.floor(k / R)) + slot(m, k) * (dh + sg);  // slice k of W_m, regrouped
     const ZX = hx(KV) + 10, OXO = ZX + d + 18, YWO = YA - g - d;
@@ -91,33 +106,50 @@
       { vis: [from(REG)], hl: [one(REG)] }, h('span', 'hd-ht',
         { html: R === 1 ? `head ${j + 1}` : `heads ${Array.from({ length: R }, (_, r) => j * R + r + 1).join(', ')}` }))));
     // x, and a faint rail: the same x feeds every head
-    els.push(box('hd-rail', XX + d + 8, YP + n / 2 - 1, hx(KV - 1) - 14 - (XX + d + 8), 2, { vis: [from(REG)] }),
+    els.push(box('hd-rail', XX + d + 8, YP + n / 2 - 1, hx(KV - 1) - 14 - (XX + d + 8), 2, { vis: [from(REGQ)] }),
       act(XX, YP, d, COL.x, 'x', { hl: [one(0), one(PROJ)] }),
       brace('left', YP, YP + n, XX, 'n'), brace('top', XX, XX + d, YP, 'd'));
+    // the latent: c = x · W_DKV, d_c wide, and its shadow copy on the second row, an arrow from c
+    if (LAT) {
+      const y1 = YP + n + 8, y2 = YP2 - 8, ax = XC + DC / 2;
+      els.push(box('at-w', XC, YW, DC, d, { vis: [from(PROJ)], hl: [one(PROJ)] }, name('W<sub>DKV</sub>', { cls: 'hd-sm' })),
+        brace('top', XC, XC + DC, YW, 'd<sub>c</sub>', [from(PROJ)]), brace('left', YW, YW + d, XC, 'd', [from(PROJ)]),
+        act(XC, YP, DC, COL.c, 'c', { vis: [from(PROJ)], hl: [one(PROJ), one(UW), one(FINAL)] }),
+        box('', ax - 8, y1, 16, y2 - y1, { vis: [[UW, REG]],
+          html: `<svg width="16" height="${y2 - y1}" style="position:absolute;left:0;top:0;overflow:visible">`
+            + `<path d="M8,0 V${y2 - y1 - 1} M2,${y2 - y1 - 9} L8,${y2 - y1 - 1} L14,${y2 - y1 - 9}" fill="none" stroke="${COL.c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` }),
+        // dimmed with a filter: an inline opacity would override .is-off
+        act(XC, YP2, DC, COL.c, 'c', { vis: [[UW, REG]], hl: [one(UW), one(UP)], style: 'filter:brightness(.7) saturate(.7)' }),
+        box('', XC - 4, YP2 - 4, DC + 8, n + 8, { vis: [[UW, REG]], style: `border:2px dashed ${COL.c}; border-radius:4px` }));
+    }
 
     // the H + 2 KV slices: weight slice above its product slice, both move from fused to regrouped
     QKV.forEach(([nm, color], m) => (m ? groups : heads).forEach((k) => {
-      const e = box('at-box hd-slice', fx(m, k), YW, dh, d + g + n,
-        { vis: [from(PROJ)], hl: k === 0 ? [one(SLICE)] : [] },
-        h('div', 'at-w hd-w', { style: `height:${d}px; --hd-c:${color}` },
-          name(sup('W', nm, `(${k + 1})`), { cls: 'hd-sm', vis: [from(REG)] })),
-        h('div', 'hd-act', { style: `top:${d + g}px; height:${n}px` }, ...rowsOf(dh, color),
-          name(`${nm}<sub>${k + 1}</sub>`, { cls: 'hd-sm', vis: [from(REG)] })));
+      const up = LAT && m, end = m ? REG : REGQ;
+      const e = box('at-box hd-slice', fxF(m, k), YP + fyF(m) - g - wh(m), dh, wh(m) + g + n,
+        { vis: [from(up ? UW : PROJ)], hl: k === 0 ? [one(SLICE)] : [] },
+        h('div', 'at-w hd-w', { style: `height:${wh(m)}px; --hd-c:${color}` },
+          name(sup('W', up ? `U${nm}` : nm, `(${k + 1})`), { cls: 'hd-sm', vis: [from(end)] })),
+        h('div', 'hd-act', { style: `top:${wh(m) + g}px; height:${n}px`, vis: [from(up ? UP : PROJ)] }, ...rowsOf(dh, color),
+          name(`${nm}<sub>${k + 1}</sub>`, { cls: 'hd-sm', vis: [from(end)] })));
       els.push(e);
-      moves.push([e, REG, sx(m, k) - fx(m, k), 0]);
+      moves.push([e, end, sx(m, k) - fxF(m, k), -fyF(m)]);
     }));
     // names and braces of the side-by-side layout
     QKV.forEach(([nm], m) => {
-      const vis = [[PROJ, REG]], w = W[m];
-      els.push(box('at-box hd-name', fx(m, 0), YW, w, d + g + n, { vis, hl: [one(PROJ)] }),
-        box('hd-name', fx(m, 0), YW, w, d, { vis }, name(`W<sub>${nm}</sub>`)),
-        box('hd-name', fx(m, 0), YP, w, n, { vis }, name(nm)),
-        brace('top', fx(m, 0), fx(m, 0) + w, YW, w === d ? 'd' : `${KV} ${DH}`, [one(PROJ)]));
+      // st: the product shows; sw: its weights show (latent: one step earlier); end: regrouped
+      const up = LAT && m, st = up ? UP : PROJ, sw = up ? UW : PROJ, end = m ? REG : REGQ;
+      const w = W[m], x0 = fxF(m, 0), y0 = YP + fyF(m), top = y0 - g - wh(m);
+      els.push(box('at-box hd-name', x0, top, w, wh(m) + g + n, { vis: [[st, end]], hl: [one(st)] }),
+        box('hd-name', x0, top, w, wh(m), { vis: [[sw, end]] }, name(`W<sub>${up ? 'U' : ''}${nm}</sub>`)),
+        box('hd-name', x0, y0, w, n, { vis: [[st, end]] }, name(nm)),
+        brace('top', x0, x0 + w, top, w === d ? 'd' : `${KV} ${DH}`, [[sw, st + 1]]));
+      if (up && m === 2) els.push(brace('right', top, top + wh(m), x0 + w, 'd<sub>c</sub>', [[sw, st + 1]]));
     });
-    els.push(brace('left', YW, YW + d, fx(0, 0), 'd', [[PROJ, REG]]),
-      ...heads.map((k) => brace('top', fx(0, k), fx(0, k) + dh, YW, DH, [[SLICE, REG]])),
-      brace('top', sx(0, 0), sx(0, 0) + dh, YW, DH, [from(REG)]),
-      brace('left', YW, YW + d, sx(0, 0), 'd', [from(REG)]));
+    // with a latent, W_DKV's brace says d: the ones of W_Q would sit on W_DKV
+    if (!LAT) els.push(brace('left', YW, YW + d, fx(0, 0), 'd', [[PROJ, REG]]), brace('left', YW, YW + d, sx(0, 0), 'd', [from(REG)]));
+    els.push(...heads.map((k) => brace('top', fxF(0, k), fxF(0, k) + dh, YW, DH, [[SLICE, REGQ]])),
+      brace('top', sx(0, 0), sx(0, 0) + dh, YW, DH, [from(REGQ)]));
 
     // per head, on its row of its column: A_h under Q_h and K, Z_h under V
     heads.forEach((k) => {
