@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="themes/ffn.css">
 <link rel="stylesheet" href="themes/norm.css">
 <link rel="stylesheet" href="themes/swa.css">
+<link rel="stylesheet" href="themes/rope.css">
 <script>
 window.MathJax = {
   tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
@@ -185,7 +186,7 @@ Left out of the drawing:
 
 <!-- ================================================================ -->
 <section>
-<h1>Sparse Multi-Latent Attention</h1>
+<h1>DSA, aka Sparse MLA</h1>
 
 <div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-latent="4" data-unit="16" data-sparse="2">
 <p>The multi-latent layer again: H = 4 heads. Input <strong>x</strong>: n × d</p>
@@ -472,6 +473,136 @@ Qwen3 MoE: softmax over all experts, keep the top k, then renormalize the kept o
 </section>
 
 <!-- ================================================================ -->
+<section>
+<h1>RoPE, one head, one token</h1>
+
+<style>
+/* the score and attention rows hold fractions: taller rows */
+section .eqfrac.rope tbody tr:is(:nth-child(4), :nth-child(6)) > td { height: 64px; }
+/* « ⋯ » stands for ␣city ␣of: a narrow, dim column */
+section .eqfrac.rope :is(td, th):nth-child(3) { color: var(--cutebugs-dim); width: 40px; }
+</style>
+
+<div class="eqgrid eqfrac rope" data-fixed="1" data-colors="slate blue magenta red orange green green red">
+<table>
+<thead>
+<tr><th><strong>token</strong><br>position j = 1 … 8</th><th>The</th><th>⋯</th><th>␣Paris</th><th>␣is</th><th>␣the</th><th>␣capital</th><th>␣of</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>input</strong><br>what the model knows</td><td>$x_1$</td><td>⋯</td><td>$x_4$</td><td>$x_5$</td><td>$x_6$</td><td>$x_7$</td><td>$x_8$</td></tr>
+<tr><td><strong>query</strong><br>R<sub>8</sub>: pair k turns 8 · θ<sub>k</sub></td><td>·</td><td>⋯</td><td>·</td><td>·</td><td>·</td><td>·</td><td>$q_8 = x_8 W_Q\,\color{#ff9f43}{R_8}$</td></tr>
+<tr><td><strong>key</strong><br>R<sub>j</sub>: pair k turns j · θ<sub>k</sub></td><td>$k_1 = x_1 W_K\,\color{#ff9f43}{R_1}$</td><td>⋯</td><td>$k_4 = x_4 W_K\,\color{#ff9f43}{R_4}$</td><td>$k_5 = x_5 W_K\,\color{#ff9f43}{R_5}$</td><td>$k_6 = x_6 W_K\,\color{#ff9f43}{R_6}$</td><td>$k_7 = x_7 W_K\,\color{#ff9f43}{R_7}$</td><td>$k_8 = x_8 W_K\,\color{#ff9f43}{R_8}$</td></tr>
+<tr><td><strong>score</strong><br>how well each key answers</td><td>$s_1 = \dfrac{q_8 \cdot k_1}{\sqrt{d_h}}$</td><td>⋯</td><td>$s_4 = \dfrac{q_8 \cdot k_4}{\sqrt{d_h}}$</td><td>$s_5 = \dfrac{q_8 \cdot k_5}{\sqrt{d_h}}$</td><td>$s_6 = \dfrac{q_8 \cdot k_6}{\sqrt{d_h}}$</td><td>$s_7 = \dfrac{q_8 \cdot k_7}{\sqrt{d_h}}$</td><td>$s_8 = \dfrac{q_8 \cdot k_8}{\sqrt{d_h}}$</td></tr>
+<tr><td><strong>distance</strong><br>only 8 − j is left</td><td>$q_8 \cdot k_j = x_8 W_Q\, \color{#ff9f43}{R_8 R_j^{\mathsf T}}\, (x_j W_K)^{\mathsf T} = x_8 W_Q\, \color{#ff9f43}{R_{8-j}}\, (x_j W_K)^{\mathsf T}$</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td><strong>attention</strong><br>weights that sum to 1</td><td>$a_1 = \dfrac{e^{s_1}}{\sum\nolimits_i e^{s_i}}$</td><td>⋯</td><td>$a_4 = \dfrac{e^{s_4}}{\sum\nolimits_i e^{s_i}}$</td><td>$a_5 = \dfrac{e^{s_5}}{\sum\nolimits_i e^{s_i}}$</td><td>$a_6 = \dfrac{e^{s_6}}{\sum\nolimits_i e^{s_i}}$</td><td>$a_7 = \dfrac{e^{s_7}}{\sum\nolimits_i e^{s_i}}$</td><td>$a_8 = \dfrac{e^{s_8}}{\sum\nolimits_i e^{s_i}}$</td></tr>
+<tr><td><strong>value</strong><br>not rotated</td><td>$v_1 = x_1 W_V$</td><td>⋯</td><td>$v_4 = x_4 W_V$</td><td>$v_5 = x_5 W_V$</td><td>$v_6 = x_6 W_V$</td><td>$v_7 = x_7 W_V$</td><td>$v_8 = x_8 W_V$</td></tr>
+<tr><td><strong>update</strong><br>the sum is added to « of »</td><td>$x_8 \mathrel{+}= (a_1 v_1 + a_2 v_2 + \cdots + a_8 v_8)\, W_O$ → <strong>France</strong></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+</table>
+</div>
+<script src="themes/eqgrid.js"></script>
+
+<aside class="notes" data-markdown>
+The table of « Attention, one head, one token » (inference deck), with the two RoPE changes:
+q and k are multiplied by a rotation that depends on their position; v is not.
+
+R_j is block-diagonal: d_h / 2 blocks of 2 × 2 rotations, block k turns by the angle
+j · θ_k, θ_k = base^(−2(k−1)/d_h). Fast pairs (θ_1 = 1 rad per position) to slow pairs
+(Qwen3-1.7B: d_h = 128, 64 pairs, base 1 000 000, the slowest turns ~1.4e-6 rad per position).
+How R_j is applied in practice: the next two slides.
+
+Why the distance row holds: rotations compose, R_8 R_jᵀ = R_{8−j}. So the score of « of »
+for a key 3 tokens back is computed with the same R_3 wherever the sentence sits in the context.
+No weights, no extra vector added to x (unlike GPT-2's learned absolute positions).
+</aside>
+
+<!-- Content aimed at the followers: hidden on the projector, displayed by the deck
+     itself when it is embedded in the follower view (themes/followers.js). The
+     steps are the eqgrid's (one per table row after « input »); lines carry their
+     file line number (data-n) and the steps they belong to (data-s). -->
+<div class="followers" hidden>
+<pre class="code">
+<code>
+<span class="ln" data-n="1">def rotation(angles):</span>
+<span class="ln" data-n="2">    """block-diagonal: one 2 x 2 rotation per pair"""</span>
+<span class="ln" data-n="3">    c, s = np.cos(angles), np.sin(angles)</span>
+<span class="ln" data-n="4">    return block_diag(*[[[ci, si], [-si, ci]] for ci, si in zip(c, s)])</span>
+<span class="ln" data-n="5"></span>
+<span class="ln" data-n="6">def rope_attention(xs, Wq, Wk, Wv, Wo, theta):</span>
+<span class="ln" data-n="7">    """xs is the array of x_j, token j at position j"""</span>
+<span class="ln" data-n="8" data-s="1">    R = [rotation(j * theta) for j in range(1, len(xs) + 1)]</span>
+<span class="ln" data-n="9" data-s="1">    q = xs[-1] @ Wq @ R[-1]</span>
+<span class="ln" data-n="10">    dh = Wq.shape[1]</span>
+<span class="ln" data-n="11">    s = np.empty(len(xs))</span>
+<span class="ln" data-n="12">    for j, x in enumerate(xs):</span>
+<span class="ln" data-n="13" data-s="2">        k = x @ Wk @ R[j]</span>
+<span class="ln" data-n="14" data-s="3 4">        s[j] = q @ k / np.sqrt(dh)</span>
+<span class="ln" data-n="15" data-s="5">    a = np.exp(s) / np.sum(np.exp(s))</span>
+<span class="ln" data-n="16">    z = np.zeros(Wv.shape[1])</span>
+<span class="ln" data-n="17">    for j, x in enumerate(xs):</span>
+<span class="ln" data-n="18" data-s="6">        v = x @ Wv</span>
+<span class="ln" data-n="19" data-s="7">        z = z + a[j] * v</span>
+<span class="ln" data-n="20" data-s="7">    return z @ Wo</span>
+</code>
+</pre>
+</div>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>RoPE as a matmul</h1>
+
+<div class="viz" data-anim="rope-matmul">
+<p>One matrix: <strong>Q</strong>, n × d<sub>h</sub>, one row per position; each row is d<sub>h</sub> / 2 <strong>pairs</strong> (a<sub>k</sub>, b<sub>k</sub>)</p>
+<p>Row 1: q′<sub>1</sub> = q<sub>1</sub> · <strong>R<sub>1</sub></strong>, d<sub>h</sub> × d<sub>h</sub>: one 2 × 2 rotation per pair, c = cos 1·θ<sub>k</sub>, s = sin 1·θ<sub>k</sub></p>
+<p>Row 2: <strong>another matrix</strong>, R<sub>2</sub>: every angle doubles</p>
+<p>Row 3: R<sub>3</sub></p>
+<p>Row 4: R<sub>4</sub>. n positions, <strong>n matrices</strong>: not one matmul, n vector × matrix products</p>
+<p>And mostly <strong>zeros</strong>: each product does d<sub>h</sub><sup>2</sup> multiply-adds, only 2 d<sub>h</sub> of them useful</p>
+</div>
+
+<aside class="notes" data-markdown>
+The textbook form (Su et al., RoFormer): q′_i = q_i R_i, R_i block-diagonal with one 2 × 2 block
+[[cos iθ_k, sin iθ_k], [−sin iθ_k, cos iθ_k]] per pair k (row vectors, so the transpose of the
+usual column-vector rotation). θ_k = base^(−2(k−1)/d_h); drawn: 40°, 15°, 5° per position.
+
+Why not do it this way: a different matrix per row (no single GEMM; a batched GEMV at best), and
+d_h² work for 2 d_h nonzeros. Qwen3-1.7B, d_h = 128: 16 384 multiply-adds per row, 256 useful.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>RoPE, elementwise</h1>
+
+<div class="viz" data-anim="rope-ew">
+<p>The same <strong>Q</strong>, n × d<sub>h</sub>, pairs (a<sub>k</sub>, b<sub>k</sub>) side by side</p>
+<p><strong>cos</strong> table, n × d<sub>h</sub>: row i holds cos i θ<sub>k</sub> under a<sub>k</sub> and b<sub>k</sub>; computed once, not a weight</p>
+<p><strong>Q ⊙ cos</strong>: elementwise, each number times the cosine of its pair's angle</p>
+<p><strong>rot(Q)</strong>: inside each pair, swap and negate the first, (a, b) → (−b, a): no arithmetic</p>
+<p><strong>sin</strong> table: the same layout, sin i θ<sub>k</sub>; rot(Q) ⊙ sin</p>
+<p>Add: <strong>Q′ = Q ⊙ cos + rot(Q) ⊙ sin</strong>, the same Q′ as q<sub>i</sub> · R<sub>i</sub>, row by row</p>
+<p>Row 4, pair 1: a′ = a cos 4θ<sub>1</sub> − b sin 4θ<sub>1</sub>, b′ = b cos 4θ<sub>1</sub> + a sin 4θ<sub>1</sub>: one 2 × 2 block of R<sub>4</sub></p>
+<p>Cost: <strong>3 operations per number</strong>, no zeros; and kernels fuse it with QK-norm or attention</p>
+</div>
+
+<aside class="notes" data-markdown>
+What implementations run (HF transformers apply_rotary_pos_emb, vLLM / FlashInfer kernels):
+q * cos + rotate_half(q) * sin. The cos / sin tables (n × d_h) are computed once per position
+and shared by every head and every layer; RoPE has no weights.
+
+Drawn with adjacent pairs (a_k, b_k) to match the matmul slide. HF Llama / Qwen pair column k
+with k + d_h/2 instead (rotate_half: [x1, x2] → [−x2, x1] on the two halves): the same rotation
+up to a fixed permutation of the columns of W_Q and W_K, chosen because contiguous halves
+vectorize better.
+
+Cost: 2 multiplies + 1 add per number, 3 d_h per row vs d_h² for the matmul (Qwen3: 384 vs
+16 384), and it is memory bound anyway: fused into the QK-norm kernel or the attention kernel,
+it costs no extra trip through memory.
+</aside>
+</section>
+
+<!-- ================================================================ -->
 <section class="title">
 <h1>Normalization</h1>
 </section>
@@ -617,6 +748,7 @@ which is exactly why each sub-layer starts with an input norm.
 <script src="themes/kda.js"></script>
 <script src="themes/kda-matrices.js"></script>
 <script src="themes/norm.js"></script>
+<script src="themes/rope.js"></script>
 <script src="themes/swa.js"></script>
 <script src="vendor/reveal/reveal.js"></script>
 <script src="vendor/reveal/notes.js"></script>

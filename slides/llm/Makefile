@@ -57,14 +57,31 @@ $(QKV_DATA): tools/qkv_map.py
 qkv: $(QKV_DATA) tools/qkv_slide.py tools/deckslide.py
 	python3 -B tools/qkv_slide.py $(QKV_DATA)
 
+# « GPT-2 learned a helix » (architecture.html, Position): a PCA of GPT-2's learned
+# position table; writes data/helix-gpt2.json and themes/helix-data.js (read by the
+# slide, which must work from file://). Only the weights are read, no prompt is run.
+HELIX_DATA=data/helix-gpt2.json
+
+$(HELIX_DATA) themes/helix-data.js: tools/helix.py
+	uv run tools/helix.py --model gpt2
+
+# the same PCA for GPT-2, GPT-1, BERT and RoBERTa: each component against its best sine,
+# and the cos/sin pairs (circles)
+HELIX_MODELS=data/helix-models.json
+
+$(HELIX_MODELS) themes/helix-models.js: tools/helix.py
+	uv run tools/helix.py --compare gpt2 openai-gpt bert-base-uncased roberta-base
+
+helix: $(HELIX_DATA) $(HELIX_MODELS)
+
 # « Decoding repeats itself »: greedy passes without cache, real numbers of every row;
 # writes themes/kvpasses.js directly, and is phony so that a plain `make` never runs the model
 kv:
 	uv run tools/kv_passes.py --model $(LENS_MODEL)
 
-slides: lens attn qkv kv
+slides: lens attn qkv kv helix
 
-.PHONY: all pdf www serve push zip clean lens attn qkv kv slides
+.PHONY: all pdf www serve push zip clean lens attn qkv kv helix slides
 
 # Everything the decks need to run in a browser, online (push) or offline (zip)
 DECK_FILES=index.html next-word-prediction.html inference.html megakernel.html architecture.html follower.html exercises/next-word-probability-similarity.ipynb $(wildcard themes/*.css themes/*.js themes/*.svg) vendor/reveal/reveal.css vendor/reveal/reveal.js vendor/reveal/notes.js vendor/mathjax/tex-svg-full.js vendor/qrcode.min.js

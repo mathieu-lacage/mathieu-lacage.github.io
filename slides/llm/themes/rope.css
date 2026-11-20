@@ -1,0 +1,21 @@
+/* Position section of architecture.html: RoPE */
+/* RoPE on one matrix (themes/rope.js): « RoPE as a matmul », « RoPE, elementwise » */
+.viz[data-anim="rope-matmul"] .viz-caps, .viz[data-anim="rope-ew"] .viz-caps { top: 456px; }
+.rm-c { position: absolute; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; line-height: 1; color: var(--cutebugs-ink); outline: 3px solid transparent; outline-offset: -3px; }
+.rm-c.is-hl { outline-color: var(--cutebugs-red); }
+.rm-zero { border: 1px solid var(--cutebugs-dim); color: var(--cutebugs-dim); }
+.rm-zero.is-hl { color: var(--cutebugs-red); background: repeating-linear-gradient(45deg, rgba(245,196,81,.25) 0 2px, transparent 2px 6px); }
+.rm-neg { background-image: repeating-linear-gradient(45deg, rgba(15,24,41,.75) 0 2px, transparent 2px 5px) !important; }
+.rm-mv { transition: translate .8s cubic-bezier(.6, .05, .3, 1) .5s; }
+.rm-hd { font-size: 15px; line-height: 20px; color: var(--cutebugs-slate); }
+.rm-lab { font-size: 19px; color: var(--cutebugs-ink); }
+.rm-tok { font-family: 'IBM Plex Mono', monospace; font-size: 16px; line-height: 30px; color: var(--cutebugs-slate); text-align: right; }
+.rm-pos { font-family: 'IBM Plex Mono', monospace; font-size: 15px; line-height: 30px; color: var(--cutebugs-slate); }
+.rm-big { font-size: 30px; line-height: 40px; text-align: right; color: var(--cutebugs-ink); }
+.rm-note { font-size: 16px; line-height: 22px; text-align: right; color: var(--cutebugs-slate); }
+.rm-note.rm-left { text-align: left; }
+.rm-op { font-size: 30px; display: flex; align-items: center; justify-content: center; color: var(--cutebugs-slate); }
+.rm-op.is-hl { color: var(--cutebugs-red); }
+.rm-cost { font-size: 19px; line-height: 1.5; text-align: left; white-space: normal; color: var(--cutebugs-ink); }
+.rm-cost.is-hl { color: var(--cutebugs-red); }
