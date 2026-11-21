@@ -1,0 +1,27 @@
+/* Attention trade-off slides (themes/tradeoffs.js): an SVG in slide coordinates on a layer over the
+   whole slide; the caption box sits above the footer, as in themes/swa.css. */
+.tr { position: absolute; inset: 0; pointer-events: none; }
+.tr-body { position: absolute; inset: 0; }
+.tr-body > svg { position: absolute; left: 0; top: 0; overflow: visible; }
+.tr svg text { font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; letter-spacing: normal; fill: var(--cutebugs-ink); }
+.tr-caps { position: absolute; left: 72px; right: 72px; top: 584px; display: grid; }
+.tr-caps > p {
+  grid-area: 1 / 1; margin: 0 !important; min-height: 58px; font-size: 23px; line-height: 1.3; box-sizing: border-box;
+  background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-blue); padding: 12px 22px;
+}
+.tr-caps > p.is-off { visibility: hidden; }
+.tr [data-s], .tr [data-e] { transition: opacity .35s; }
+.tr .off { opacity: 0 !important; }
+@media (prefers-reduced-motion: reduce) { .tr [data-s], .tr [data-e] { transition: none; } }
+
+/* Conclusion: a 2 × 2 grid of cards, the last one (hybrids) highlighted */
+.tr-concl { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 26px; height: 450px; flex: none; }
+.tr-concl > div {
+  background: var(--cutebugs-panel); border-left: 6px solid var(--cutebugs-blue); padding: 18px 26px;
+  display: flex; flex-direction: column; box-sizing: border-box;
+}
+.tr-concl > div.tr-best { border-left-color: var(--cutebugs-red); }
+.tr-concl h2 { margin: 0 0 .3em; font-size: 31px; }
+.tr-concl .tr-best h2 { color: var(--cutebugs-red); }
+.tr-concl p { margin: 0; font-size: 24px; line-height: 1.35; }
+.tr-concl .tr-who { margin-top: auto; padding-top: .6em; font-size: 19px; color: var(--cutebugs-slate); letter-spacing: .5px; }
