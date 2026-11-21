@@ -251,6 +251,7 @@
 .viz[data-anim="kda-matrices"][data-st="2"] :is(.ke-s, .ke-B),
 .viz[data-anim="kda-matrices"][data-st="3"] .ke-B,
 .viz[data-anim="kda-matrices"][data-st="4"] :is(.ke-A, .ke-s) { opacity: .25; }
+.viz[data-anim="lin-matrices"][data-st="1"] .ke-s { opacity: .25; }
 /* W_Q^(1): superscript stacked over subscript */
 .hd-ss { display: inline-flex; flex-direction: column; font-size: 62%; line-height: 1; vertical-align: .5em; margin-left: 1px; }
 /* O: one layer per head */

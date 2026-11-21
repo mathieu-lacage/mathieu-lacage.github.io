@@ -5,7 +5,8 @@
 // context n, plus a quality strip. The variants up to data-upto (deck order) are drawn, the earlier
 // ones in slate, data-upto in gold, MHA in blue.
 // <div class="tr" data-tr="plane">: the history slide, every variant on one plane (x compute,
-// y KV cache, both at n = 128K, colour quality), revealed in chronological order.
+// y KV cache, both at n = 128K, colour quality), revealed in chronological order, with a vertical
+// timeline on the right naming one representative model per variant.
 // <div class="tr" data-tr="lanes">: an alternative history slide (unused), one lane per trick.
 // The <p> children are the captions, one per step. Elements carry their visibility as in
 // themes/swa.js (data-s / data-e: first / last step). Uses steps.js. Styles: themes/tradeoffs.css.
@@ -41,14 +42,20 @@
     MLA: { mem: (n) => L * n * 576 * B, fl: (n) => L * dense(n, 192, dh), q: 0.2 },
     DSA: { mem: (n) => L * n * (576 * B + 128), fl: (n) => L * (2 * pairs(n) * 32 * 128 + 2 * win(n, 2048) * H * 320), q: 0.1 },
     SWA: { mem: (n) => L * Math.min(n, 4096) * 2 * H * dh * B, fl: (n) => L * 2 * win(n, 4096) * H * 2 * dh, q: -0.85 },
-    KDA: { mem: () => L * kdaMem, fl: (n) => L * kdaFl(n), q: -1 },
+    // linear attention (Katharopoulos et al. 2020): the same d_k × d_v state, no decay, no delta rule
+    Linear: { mem: () => L * kdaMem, fl: (n) => L * 2 * n * H * (2 * dh * dh + 64 * 2 * dh), q: -1 },
+    KDA: { mem: () => L * kdaMem, fl: (n) => L * kdaFl(n), q: -0.8 },
     // hybrids: Gemma 3's pattern, 5 SWA layers (W = 1 024) per global layer, on MHA as SWA above;
     // Kimi Linear, 3 KDA layers per MLA layer
     'SWA 5:1': { mem: (n) => L / 6 * (5 * Math.min(n, 1024) + n) * 2 * H * dh * B,
                  fl: (n) => L / 6 * (5 * 2 * win(n, 1024) + 2 * pairs(n)) * H * 2 * dh, q: -0.15 },
     'KDA 3:1': { mem: (n) => L / 4 * (3 * kdaMem + n * 576 * B), fl: (n) => L / 4 * (3 * kdaFl(n) + dense(n, 192, dh)), q: 0.6 },
+    // Jamba (AI21, 2024): 7 Mamba layers per attention layer (GQA, 8 KV heads). A Mamba layer keeps
+    // d_inner × d_state = 8 192 × 16 numbers; its compute is taken as KDA's (same order). History only.
+    'Mamba 7:1': { mem: (n) => L / 8 * (7 * 2 * 4096 * 16 * B + n * 2 * 8 * dh * B),
+                   fl: (n) => L / 8 * (7 * kdaFl(n) + dense(n, dh, dh)), q: 0 },
   };
-  const DECK = ['MHA', 'MQA', 'SWA', 'SWA 5:1', 'GQA', 'MLA', 'DSA', 'KDA', 'KDA 3:1'];   // chronological, as in the deck
+  const DECK = ['MHA', 'MQA', 'SWA', 'SWA 5:1', 'Linear', 'GQA', 'MLA', 'DSA', 'KDA', 'KDA 3:1'];   // chronological, as in the deck
 
   // ---- log scales ----
   const lg = Math.log10;
@@ -152,7 +159,7 @@
     const qx = 1090, qy = (q) => 340 - q * 140, s0 = s;
     s += text(1060, 172, 'Quality vs MHA', 'font-size:19px;font-weight:600');
     [['better', 0.65, Q.better], ['≈ MHA', 0, C.ink], ['worse', -0.8, Q.worse]].forEach(([t, q, c]) =>
-      { s += text(1060, qy(q) + 5, t, `font-size:14px;fill:${c};text-anchor:start`); });
+      { s += text(1076, qy(q) + 5, t, `font-size:14px;fill:${c};text-anchor:start`); });
     s += line(qx + 50, qy(1), qx + 50, qy(-1.1), C.line, 'stroke-width="2"') +
       line(qx + 44, qy(0.3), qx + 56, qy(0.3), C.line, 'stroke-width="2"') + line(qx + 44, qy(-0.3), qx + 56, qy(-0.3), C.line, 'stroke-width="2"');
     // the grade picks the band; inside a band the dots are spaced evenly, ordered by q
@@ -175,47 +182,53 @@
     return svg(s);
   };
 
-  // ---- history 1: one plane, x = compute, y = KV cache (both at n = 128K), colour = quality;
-  // variants added in chronological order, an arrow from their parent ----
+  // ---- history: one plane, x = compute, y = KV cache (both at n = 128K), colour = quality; the variants
+  // added in chronological order, a vertical timeline on the right with one representative model each ----
   const HIST = [
-    { id: 'MHA', yr: 2017.45 }, { id: 'MQA', yr: 2019.85, from: 'MHA' }, { id: 'SWA', yr: 2020.3 },
-    { id: 'GQA', yr: 2023.4, from: 'MQA' }, { id: 'MLA', yr: 2024.4 }, { id: 'SWA 5:1', yr: 2024.55, from: 'SWA' },
-    { id: 'DSA', yr: 2025.7, from: 'MLA' }, { id: 'KDA', yr: 2025.78 }, { id: 'KDA 3:1', yr: 2025.86, from: 'KDA' },
+    { id: 'MHA', yr: 2017.45 }, { id: 'MQA', yr: 2019.85 }, { id: 'SWA', yr: 2020.3 }, { id: 'Linear', yr: 2020.45 },
+    { id: 'GQA', yr: 2023.4 }, { id: 'Mamba 7:1', yr: 2024.2 }, { id: 'MLA', yr: 2024.4 }, { id: 'SWA 5:1', yr: 2024.55 },
+    { id: 'DSA', yr: 2025.7 }, { id: 'KDA', yr: 2025.78 }, { id: 'KDA 3:1', yr: 2025.86 },
   ];
-  // quality, three grades: worse (orange), ≈ MHA (light neutral), better (green); q within ±0.3 is ≈
+  // one representative model per variant, none when no model shipped it as is
+  const MODEL = { MHA: 'Llama 2 7B', MQA: 'PaLM', SWA: 'Mistral 7B', GQA: 'Qwen3', 'Mamba 7:1': 'Jamba',
+    MLA: 'DeepSeek-V3', 'SWA 5:1': 'Gemma 3', DSA: 'DeepSeek-V3.2', 'KDA 3:1': 'Kimi-Linear-48B-A3B' };
+  // 1-D placement: labels of heights w at wanted centres c, at least gap apart, inside [lo, hi]
+  const spread = (c, w, gap, lo, hi) => {
+    const n = c.length, a = c.map((ci, i) => ci - w[i] / 2);
+    for (let i = 0; i < n; i++) a[i] = Math.max(a[i], i ? a[i - 1] + w[i - 1] + gap : lo);
+    if (a[n - 1] + w[n - 1] > hi) a[n - 1] = hi - w[n - 1];
+    for (let i = n - 2; i >= 0; i--) a[i] = Math.min(a[i], a[i + 1] - w[i] - gap);
+    return a.map((ai, i) => ai + w[i] / 2);
+  };
   FIG.plane = () => {
-    const N = 128 * 1024, x0 = 250, x1 = 980, y0 = 262, y1 = 520;
+    const N = 128 * 1024, x0 = 230, x1 = 880, y0 = 200, y1 = 520;
     const sx = scale(1e13, 1e16, x0, x1), sy = scale(1e7, 1e11, y1, y0);
-    let s = '';
-    // timeline ribbon
-    const tx = (yr) => 170 + (yr - 2017) / 9 * 990;
-    s += line(tx(2017), 170, tx(2026), 170, C.line, 'stroke-width="2"');
-    for (let yr = 2017; yr <= 2025; yr++) s += line(tx(yr), 165, tx(yr), 175, C.slate) + text(tx(yr), 158, yr, `font-size:13px;fill:${C.slate};text-anchor:middle`);
+    // quality legend, one row above the plane
+    let s = text(x0, 160, 'Quality vs MHA:', 'font-size:16px;font-weight:600') +
+      [['better', 1], ['≈ MHA', 0], ['worse', -1]].map(([t, q], i) =>
+        `<circle cx="${x0 + 140 + i * 100}" cy="155" r="8" fill="${qcol(q)}"/>` + text(x0 + 154 + i * 100, 160, t, 'font-size:16px')).join('') +
+      text(x0 + 450, 160, '(from each paper\'s ablations)', `font-size:13px;fill:${C.slate}`);
     // axes
     for (let e = 13; e <= 16; e++) s += line(sx(10 ** e), y0, sx(10 ** e), y1, C.line) + text(sx(10 ** e), y1 + 20, SI(10 ** e, 'FLOP'), `font-size:13px;fill:${C.slate};text-anchor:middle`);
     for (let e = 7; e <= 11; e++) s += line(x0, sy(10 ** e), x1, sy(10 ** e), C.line) + text(x0 - 8, sy(10 ** e) + 5, SI(10 ** e, 'B'), `font-size:13px;fill:${C.slate};text-anchor:end`);
     s += text(x1, y1 + 42, 'prefill compute at n = 128K →', `font-size:15px;fill:${C.slate};text-anchor:end`) +
       text(x0 - 8, y0 - 14, '↑ KV cache at n = 128K', `font-size:15px;fill:${C.slate};text-anchor:start`) +
       text(x0 + 10, y1 - 10, '↙ cheaper', `font-size:14px;fill:${C.slate}`);
-    // quality legend: three swatches
-    const bx = 1070;
-    s += text(bx, 280, 'Quality vs MHA', 'font-size:16px;font-weight:600') +
-      [['better', 1], ['≈ MHA', 0], ['worse', -1]].map(([t, q], i) =>
-        `<circle cx="${bx + 9}" cy="${316 + i * 36}" r="9" fill="${qcol(q)}"/>` + text(bx + 28, 321 + i * 36, t, 'font-size:16px')).join('') +
-      text(bx, 432, 'from each paper\'s', `font-size:12px;fill:${C.slate}`) + text(bx, 447, 'ablations', `font-size:12px;fill:${C.slate}`);
-    const pos = {};
+    // the timeline, top to bottom, on the right: labels in one column, tied to their dot, the model right of them
+    const VX = 975, vy = (yr) => 200 + (yr - 2017) / 9 * 330;
+    s += line(VX, vy(2017), VX, vy(2026), C.line, 'stroke-width="2"');
+    for (let yr = 2017; yr <= 2025; yr++) s += line(VX - 5, vy(yr), VX + 5, vy(yr), C.slate) + text(VX - 10, vy(yr) + 4, yr, `font-size:13px;fill:${C.slate};text-anchor:end`);
+    const ly = spread(HIST.map((v) => vy(v.yr)), HIST.map(() => 13), 4, 190, 560);
     HIST.forEach((v, k) => {
-      const row = { SWA: 1, 'SWA 5:1': 1, KDA: 1, 'KDA 3:1': 2 }[v.id] ?? 0, q = M[v.id].q;
-      s += g(`<circle cx="${tx(v.yr)}" cy="170" r="5" fill="${qcol(q)}"/>` +
-        text(tx(v.yr), 192 + row * 15, v.id, `font-size:13px;text-anchor:middle`), { s: k });
-      const x = sx(M[v.id].fl(N)), y = sy(M[v.id].mem(N));
-      pos[v.id] = [x, y];
-      if (v.from) {
-        const [fx, fy] = pos[v.from], dx = x - fx, dy = y - fy, d = Math.hypot(dx, dy) || 1;
-        s += line(fx + dx / d * 10, fy + dy / d * 10, x - dx / d * 12, y - dy / d * 12, C.slate, 'stroke-width="1.5" marker-end="url(#tr-arr)"', { s: k });
-      }
+      const q = M[v.id].q, x = sx(M[v.id].fl(N)), y = sy(M[v.id].mem(N)), ty = vy(v.yr);
+      s += g(`<circle cx="${VX}" cy="${ty}" r="5" fill="${qcol(q)}"/>` +
+        `<path d="M${VX + 6} ${ty}L${VX + 14} ${ty}L${VX + 34} ${ly[k]}L${VX + 40} ${ly[k]}" fill="none" stroke="${C.slate}" stroke-width="1"/>` +
+        text(VX + 46, ly[k] + 4.5, v.id, 'font-size:13px') +
+        (MODEL[v.id] ? text(VX + 126, ly[k] + 4.5, MODEL[v.id], `font-size:12px;fill:${C.slate}`) : ''), { s: k });
+      // the variant on the plane, ringed while it is the current step
       s += g(`<circle cx="${x}" cy="${y}" r="9" fill="${qcol(q)}" stroke="${C.slide}" stroke-width="2"/>` +
-        (v.id === 'DSA' || v.id === 'SWA' ? text(x - 14, y + 5, v.id, 'font-size:16px;text-anchor:end') : text(x + 14, y + 5, v.id, 'font-size:16px')), { s: k });
+        (v.id === 'DSA' || v.id === 'SWA' || v.id === 'Linear' ? text(x - 14, y + 5, v.id, 'font-size:16px;text-anchor:end') :
+         v.id === 'Mamba 7:1' ? text(x - 12, y + 22, v.id, 'font-size:16px;text-anchor:end') : text(x + 14, y + 5, v.id, 'font-size:16px')), { s: k });
       s += `<circle cx="${x}" cy="${y}" r="15" fill="none" stroke="${C.ink}" stroke-width="2"${A({ s: k, e: k })}/>`;
     });
     return svg(s);

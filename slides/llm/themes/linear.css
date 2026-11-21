@@ -1,0 +1,11 @@
+/* « From linear attention to KDA » (attention.html): one row per model, its state update in TeX,
+   the term each model adds in gold */
+.lin-road { border-collapse: collapse; font-size: 21px; margin-top: 4px; }
+.lin-road td { padding: 7px 14px; border-bottom: 1px solid #2a3550; vertical-align: middle; }
+.lin-road td:first-child { color: var(--cutebugs-slate); font-variant-numeric: tabular-nums; padding-left: 0; }
+.lin-road td:nth-child(2) { font-weight: 600; white-space: nowrap; }
+.lin-road td:nth-child(4) { color: var(--cutebugs-slate); font-size: 18px; }
+.lin-road tr.lin-kda td:nth-child(2) { color: var(--cutebugs-red); }
+.lin-road mjx-container { font-size: 92% !important; }
+.lin-head { font-size: 21px; color: var(--cutebugs-slate); margin: 0 0 6px; }
+.lin-foot { font-size: 22px; margin-top: 14px; }

@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="themes/swa.css">
 <link rel="stylesheet" href="themes/rope.css">
 <link rel="stylesheet" href="themes/tradeoffs.css">
+<link rel="stylesheet" href="themes/linear.css">
 <script>
 window.MathJax = {
   tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
@@ -276,6 +277,64 @@ Quality: Gemma reports little loss from the local layers; the global layer keeps
 
 <!-- ================================================================ -->
 <section>
+<h1>Linear Attention (2020)</h1>
+
+<div class="viz viz-boxed" data-anim="lin" data-tokens="Paris ␣is ␣the ␣capital">
+<p>One head. Input <strong>x</strong>: n × d, one row per token</p>
+<p>Q, K, V as in attention: x · [W<sub>Q</sub> | W<sub>K</sub> | W<sub>V</sub>]. No softmax: no n × n scores</p>
+<p>Instead, a <strong>state S</strong>, d<sub>k</sub> × d<sub>v</sub>, starts <strong>empty</strong>: S<sub>0</sub> = 0</p>
+<p>« Paris »: S<sub>1</sub> = S<sub>0</sub> + <strong>k<sub>1</sub> v<sub>1</sub><sup>T</sup></strong>: write v<sub>1</sub> at key k<sub>1</sub></p>
+<p><strong>Query</strong> right away: z<sub>1</sub> = q<sub>1</sub><sup>T</sup> S<sub>1</sub>. « Paris » reads only what it just wrote</p>
+<p>« is »: S<sub>2</sub> = S<sub>1</sub> + k<sub>2</sub> v<sub>2</sub><sup>T</sup>: <strong>just add</strong>, nothing fades, nothing is corrected</p>
+<p>z<sub>2</sub> = q<sub>2</sub><sup>T</sup> S<sub>2</sub>: S<sub>2</sub> holds « Paris » and « is », summed</p>
+<p>« the »: S<sub>3</sub> = S<sub>2</sub> + k<sub>3</sub> v<sub>3</sub><sup>T</sup></p>
+<p>z<sub>3</sub> = q<sub>3</sub><sup>T</sup> S<sub>3</sub>: each token reads the state <strong>it just wrote</strong>, one row of <strong>Z</strong></p>
+<p>« capital »: S<sub>4</sub>. S only <strong>grows</strong>: every write piles on the previous ones</p>
+<p>z<sub>4</sub> = q<sub>4</sub><sup>T</sup> S<sub>4</sub>: Z is complete</p>
+<p>Decode keeps only <strong>S<sub>4</sub></strong>: d<sub>k</sub> × d<sub>v</sub> numbers per head, <strong>whatever n</strong></p>
+</div>
+
+<aside class="notes" data-markdown>
+« Transformers are RNNs » (Katharopoulos et al., 2020): the softmax is replaced by a feature map,
+exp(q · k) → φ(q) · φ(k), so (Q Kᵀ) V = Q (Kᵀ V), computed token by token:
+
+    S_t = S_{t−1} + k_t v_tᵀ,   z_t = S_tᵀ q_t
+
+the KDA recurrence without the decay (α = 1) and without the delta rule (u_t = v_t). Same
+drawing and same numbers as « Kimi Delta Attention » (themes/kda.js), α and β left out.
+Left out: the feature map φ (elu + 1) and the normalization z_t / (q_tᵀ Σ k_j).
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Linear: State Update</h1>
+
+<div class="viz viz-boxed" data-anim="lin-matrices">
+<p>One token t: S<sub>t</sub> = S<sub>t−1</sub> + k<sub>t</sub> v<sub>t</sub><sup>T</sup>. d<sub>k</sub> = d<sub>v</sub> = 4</p>
+<p><strong>Write</strong>: k<sub>t</sub> v<sub>t</sub><sup>T</sup>, an outer product: row i is v<sub>t</sub><sup>T</sup> scaled by k<sub>t,i</sub></p>
+<p><strong>Add</strong> it to S<sub>t−1</sub>: nothing is erased, nothing fades</p>
+</div>
+
+<aside class="notes" data-markdown>
+Linear attention's update, drawn as « KDA: State Update » but without its erase and forget
+factors (KDA: S_t = (I − β_t k_t k_tᵀ) Diag(α_t) S_{t−1} + β_t k_t v_tᵀ).
+Numbers: tokens 1–3 of the linear animation give S_{t−1}, token 4 is t; S_t is S_4 there.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Linear: the cheapest, terrible quality</h1>
+<div class="tr" data-tr="compare" data-upto="Linear">
+<p>So far: every variant keeps every past token, or the last W</p>
+<p>Linear attention: compute <strong>O(n)</strong>, memory <strong>O(1)</strong> from the first token</p>
+<p>At 128K: <strong>341×</strong> less compute, <strong>2 048×</strong> less memory, the <strong>worst recall</strong></p>
+</div>
+</section>
+
+<!-- ================================================================ -->
+<section>
 <h1>Grouped-Query Attention (2023)</h1>
 
 <div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="2" data-unit="15">
@@ -308,7 +367,7 @@ halving the KV heads halves the cache, at a small cost in quality.
 <section>
 <h1>GQA: less memory, with no loss of quality</h1>
 <div class="tr" data-tr="compare" data-upto="GQA">
-<p>So far: MQA shares K / V heads, SWA forgets old tokens, unless a layer is global</p>
+<p>So far: MQA shares K / V heads, SWA forgets old tokens, linear attention keeps a fixed state</p>
 <p>GQA: still the same compute, a KV cache <strong>between the two</strong></p>
 <p>At 128K: <strong>4× less KV cache</strong> than MHA, quality back to ≈ MHA</p>
 </div>
@@ -446,6 +505,29 @@ constant. The cache holds c plus one index key per token: 1 280 B per token and 
 
 <!-- ================================================================ -->
 <section>
+<h1>From linear attention to KDA</h1>
+<p class="lin-head">Every model reads its state the same way, $z_t = S_t^\top q_t$; they differ by how they write it</p>
+<table class="lin-road">
+<tr><td>2020</td><td>Linear attention</td><td>$S_t = S_{t-1} + k_t v_t^\top$</td><td>a d × d state, no n × n scores</td></tr>
+<tr class="fragment"><td>2023</td><td>RetNet</td><td>$S_t = {\color{#f5c451}\gamma}\, S_{t-1} + k_t v_t^\top$</td><td>forget: a fixed decay γ per head</td></tr>
+<tr class="fragment"><td>2023</td><td>Mamba, GLA</td><td>$S_t = {\color{#f5c451}\mathrm{Diag}(\alpha_t)}\, S_{t-1} + k_t v_t^\top$</td><td>forget what the input says: α<sub>t</sub> from x<sub>t</sub></td></tr>
+<tr class="fragment"><td>2024</td><td>DeltaNet</td><td>$S_t = S_{t-1} + \beta_t k_t ({\color{#f5c451}v_t - S_{t-1}^\top k_t})^\top$</td><td>overwrite, don't add: write the error</td></tr>
+<tr class="fragment"><td>2024</td><td>Gated DeltaNet</td><td>$S_t = {\color{#f5c451}\alpha_t} (I - \beta_t k_t k_t^\top) S_{t-1} + \beta_t k_t v_t^\top$</td><td>both: decay and delta</td></tr>
+<tr class="fragment lin-kda"><td>2025</td><td>KDA</td><td>$S_t = (I - \beta_t k_t k_t^\top)\, {\color{#f5c451}\mathrm{Diag}(\alpha_t)}\, S_{t-1} + \beta_t k_t v_t^\top$</td><td>a decay per key channel</td></tr>
+</table>
+<p class="lin-foot fragment">Still a fixed-size state: recall needs a few <strong>full attention</strong> layers, hence the hybrids</p>
+<aside class="notes" data-markdown>
+The gold term is what each step adds. Sources: RetNet (Sun et al. 2023); GLA (Yang et al. 2023,
+gated linear attention, a per-channel data-dependent decay); Mamba (Gu, Dao 2023) is a selective
+SSM, written here in its linear-attention form (Mamba-2 makes the link exact, with a scalar decay
+per head); DeltaNet (Schlag et al. 2021, made parallel by Yang et al. 2024); Gated DeltaNet
+(Yang et al. 2024, used by Qwen3-Next in a 3:1 hybrid); KDA (Kimi Linear, 2025), the update of
+the KDA slides.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
 <h1>Kimi Delta Attention (2025)</h1>
 
 <div class="viz viz-boxed" data-anim="kda" data-tokens="Paris ␣is ␣the ␣capital">
@@ -528,9 +610,9 @@ equals S_4 there (checked in the script).
 <section>
 <h1>KDA: best compute, best memory, terrible quality</h1>
 <div class="tr" data-tr="compare" data-upto="KDA">
-<p>So far: all O(n²) but SWA, whose cache flattens at W</p>
-<p>KDA: compute <strong>O(n)</strong>, memory <strong>O(1)</strong> from the first token</p>
-<p>At 128K: <strong>256×</strong> less compute, <strong>2 048×</strong> less memory, worst recall</p>
+<p>So far: linear attention, the cheapest, but the worst recall</p>
+<p>KDA: the same <strong>O(n)</strong> and <strong>O(1)</strong> as linear attention, a little more compute</p>
+<p>At 128K: <strong>256×</strong> less compute, <strong>2 048×</strong> less memory, recall above linear, below MHA</p>
 </div>
 </section>
 
@@ -559,16 +641,19 @@ against 81.3; the MLA layer keeps exact recall, the KDA layers the cheap bulk of
 <p>2017: multi-head attention, the reference for quality and for cost</p>
 <p>2019: MQA shares one K / V head, the cache drops, so does quality</p>
 <p>2020: sliding windows bound the cache and the compute, recall suffers</p>
+<p>2020: linear attention, a fixed-size state: the cheapest, the worst recall</p>
 <p>2023: GQA, a middle ground, gets <strong>quality back</strong></p>
+<p>2024: Jamba, 7 Mamba layers per attention layer: the first big <strong>hybrid</strong></p>
 <p>2024: MLA compresses K / V: smaller cache, quality <strong>on par</strong></p>
 <p>2024: local and global layers: windows, with quality back</p>
 <p>2025: DSA, MLA reading only the top k keys: compute down</p>
-<p>2025: KDA, a fixed-size state: the cheapest, the worst recall</p>
+<p>2025: KDA, linear attention that forgets and overwrites: recall still behind</p>
 <p>2025: 3 KDA layers per MLA layer: <strong>cheap and good</strong></p>
 </div>
 <aside class="notes" data-markdown>
-Same cost model as the « where it stands » slides, read at n = 128K. Arrows: lineage
-(MHA → MQA → GQA, SWA → local / global, MLA → DSA, KDA → KDA 3:1).
+Same cost model as the « where it stands » slides, read at n = 128K. Timeline on the right: one
+representative model per variant (none for linear attention and KDA alone: no major model shipped
+them as is); Kimi-Linear-48B-A3B is Moonshot's checkpoint of the Kimi Linear architecture.
 Hybrids: « SWA 5:1 » is Gemma 3's pattern (5 layers W = 1 024 per global layer; Gemma 2 was 1:1),
 « KDA 3:1 » is Kimi Linear (3 KDA layers per MLA layer).
 Quality grades, from each paper's ablations: MQA below MHA (GQA paper); GQA ≈ MHA; MLA ≈ MHA
@@ -576,6 +661,9 @@ Quality grades, from each paper's ablations: MQA below MHA (GQA paper); GQA ≈ 
 below on long-range recall; local / global ≈ (Gemma); Kimi Linear above full MLA in a matched
 run (1.4 T tokens): RULER at 128K 84.3 against 81.3.
 SWA dates from Longformer (2020); in production in Mistral 7B (2023).
+Mamba 7:1 is Jamba (AI21, March 2024): 7 Mamba layers per attention (GQA) layer, quality ≈ the
+dense models of its size. Mamba's state (8 192 × 16 per layer) and compute (taken as KDA's) are
+approximate.
 </aside>
 </section>
 
@@ -604,6 +692,8 @@ the slopes (O(n²), O(n)), the cheap ones divide the constant.
 <script src="themes/heads.js"></script>
 <script src="themes/kda.js"></script>
 <script src="themes/kda-matrices.js"></script>
+<script src="themes/linear.js"></script>
+<script src="themes/linear-matrices.js"></script>
 <script src="themes/swa.js"></script>
 <script src="themes/tradeoffs.js"></script>
 <script src="vendor/reveal/reveal.js"></script>
