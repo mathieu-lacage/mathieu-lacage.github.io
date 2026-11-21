@@ -31,7 +31,8 @@
 //                after the regrouping: a shadow copy of x, x · [W_IQ | W_IK] = [q^I | k^I] (the lightning
 //                indexer, small heads), then its scores I (n × n), then the top k per row (the others
 //                tinted teal, .ds-drop); every head's attention reads only those keys
-// Its <p> children are the captions, one per step, in order.
+// Its <p> children are the captions, one per step, in order. More captions than timeline
+// steps: each extra one gets its own trailing step, the drawing staying in its final state.
 // Positions are slide coordinates (the root sits at 72, 150), as in attention.js; its
 // styles (.at-*) are reused. The attention patterns are illustrative: head 1 reads the
 // previous token, head 2 the first token, head 3 itself, head 4 two tokens back, and so on round.
@@ -258,7 +259,10 @@
 
     // the moving slices sit against each other: their outlines go inside
     moves.forEach(([e]) => e.classList.add('hd-mv', 'hd-in'));
-    AD.mount(root, ctx, FINAL, els, (st) => moves.forEach(([e, step, dx, dy]) => {
+    // extra <p> captions beyond the drawing's own timeline: each gets its own trailing
+    // step, the drawing staying in its final state (take-away captions, after the adds)
+    const EXTRA = Math.max(0, root.querySelectorAll(':scope > p').length - (FINAL + 1));
+    AD.mount(root, ctx, FINAL + EXTRA, els, (st) => moves.forEach(([e, step, dx, dy]) => {
       e.style.translate = st >= step ? `${dx}px ${dy}px` : '0 0';
     }));
   }

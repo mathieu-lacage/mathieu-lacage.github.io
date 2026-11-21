@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="themes/norm.css">
 <link rel="stylesheet" href="themes/swa.css">
 <link rel="stylesheet" href="themes/rope.css">
+<link rel="stylesheet" href="themes/tradeoffs.css">
 <script>
 window.MathJax = {
   tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
@@ -30,12 +31,13 @@ window.MathJax = {
 
 <!-- ================================================================ -->
 <section class="title">
-<h1>Attention</h1>
+<h1>Attention works amazingly well</h1>
+<h2>But it's slow and consumes memory like crazy</h2>
 </section>
 
 <!-- ================================================================ -->
 <section>
-<h1>Multi-Head Attention</h1>
+<h1>Multi-Head Attention (2017)</h1>
 
 <div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4">
 <p>A layer runs <strong>H heads</strong> side by side, here H = 4. Input <strong>x</strong>: n × d, with d = H · d<sub>h</sub></p>
@@ -83,35 +85,29 @@ window.MathJax = {
 
 <!-- ================================================================ -->
 <section>
-<h1>Grouped-Query Attention</h1>
-
-<div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="2" data-unit="15">
-<p>Same layer, H = 4 query heads, but only <strong>n<sub>kv</sub> = 2</strong> key / value heads</p>
-<p>W<sub>Q</sub> is still d × d, but W<sub>K</sub> and W<sub>V</sub> are only d × n<sub>kv</sub> d<sub>h</sub>: fewer weights, smaller K and V</p>
-<p>Head 1 uses its slice of W<sub>Q</sub>, and slice 1 of W<sub>K</sub> and W<sub>V</sub></p>
-<p>Regroup by <strong>key / value head</strong>: heads 1 and 2 share K<sub>1</sub>, V<sub>1</sub>; heads 3 and 4 share K<sub>2</sub>, V<sub>2</sub></p>
-<p>Each query head has its own <strong>attention</strong>: A<sub>1</sub> = softmax(Q<sub>1</sub> K<sub>1</sub><sup>T</sup> …), A<sub>2</sub> = softmax(Q<sub>2</sub> K<sub>1</sub><sup>T</sup> …)</p>
-<p>Z<sub>1</sub> = A<sub>1</sub> · V<sub>1</sub> and Z<sub>2</sub> = A<sub>2</sub> · V<sub>1</sub>: the same values, mixed differently</p>
-<p>From here on, nothing changes: the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
-<p>W<sub>O</sub> is d × d, cut into H row slices</p>
-<p>Head 1 adds Z<sub>1</sub> · W<sub>O</sub><sup>(1)</sup> to O</p>
-<p>Head 2 adds Z<sub>2</sub> · W<sub>O</sub><sup>(2)</sup></p>
-<p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
-<p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>: <strong>O</strong> = Z · W<sub>O</sub>, n × d, as in multi-head attention</p>
+<h1>MHA: The reference</h1>
+<div class="tr" data-tr="compare" data-upto="MHA">
+<p>Two plots, <strong>log-log</strong>: context n from 1K to 1M tokens, ×4 per tick</p>
+<p>MHA: the compute of a prefill of n tokens, and the KV cache it leaves</p>
+<p>×4 tokens: <strong>×16</strong> compute, slope 2, O(n²); <strong>×4</strong> memory, slope 1, O(n)</p>
+<p>At 128K: 4.5 PFLOP for the prefill, 69 GB of KV cache, <strong>512 KiB per token</strong></p>
+<p>Quality: MHA is the <strong>reference</strong>, every variant is graded against it</p>
 </div>
-
 <aside class="notes" data-markdown>
-Grouped-query attention (GQA): n_q query heads share n_kv key / value heads, n_q / n_kv
-query heads per group. n_kv = n_q is multi-head attention, n_kv = 1 multi-query attention (MQA).
-Qwen3-1.7B: 16 query heads, 8 KV heads, the same 2 per group as here; Llama-2-7B is plain MHA.
-Why: K and V are what decoding keeps for every past token (the KV cache, in « Inference »);
-halving the KV heads halves the cache, at a small cost in quality.
+Cost model, the same on every « where it stands » slide (themes/tradeoffs.js): a 32-layer
+model, d = 4 096, 32 query heads of d_h = 128, bf16 (Llama-2-7B's shape). Compute: QKᵀ and AV
+only (projections left out), prefill of n tokens, causal: 2 · n²/2 · 32 heads · 256 · 32 layers.
+Memory: K and V of all layers at context n: 2 · 4 096 · 2 B · 32 layers = 512 KiB per token.
+On a log-log plot a power law is a straight line, its slope is the exponent: n² slope 2, n
+slope 1, a constant slope 0. Parallel lines differ by a constant factor.
+The later slides: the variants seen so far in slate, the new one in gold, MHA in blue.
+Quality: three grades from each paper's own ablations, not one benchmark.
 </aside>
 </section>
 
 <!-- ================================================================ -->
 <section>
-<h1>Multi-Query Attention</h1>
+<h1>Multi-Query Attention (2019)</h1>
 
 <div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="1" data-unit="15">
 <p>Same layer, H = 4 query heads, but a <strong>single</strong> key / value head: <strong>n<sub>kv</sub> = 1</strong></p>
@@ -126,6 +122,8 @@ halving the KV heads halves the cache, at a small cost in quality.
 <p>Head 2 adds Z<sub>2</sub> · W<sub>O</sub><sup>(2)</sup></p>
 <p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
 <p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>: <strong>O</strong> = Z · W<sub>O</sub>, n × d, as in multi-head attention</p>
+<p>Less compute: only one K and V across all heads per layer</p>
+<p>Smaller KV cache: only one entry across all heads per layer</p>
 </div>
 
 <aside class="notes" data-markdown>
@@ -138,103 +136,25 @@ decode is bound by. The cost is quality and training stability, hence GQA as the
 
 <!-- ================================================================ -->
 <section>
-<h1>Multi-Latent Attention</h1>
-
-<div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-latent="4" data-unit="16">
-<p>The multi-head layer again: H = 4 heads. Input <strong>x</strong>: n × d</p>
-<p>One product x · [W<sub>DKV</sub> | W<sub>Q</sub>]: a narrow <strong>latent c</strong>, n × d<sub>c</sub>, and Q</p>
-<p>A copy of c starts a <strong>second product</strong>, with W<sub>UK</sub> | W<sub>UV</sub> above: short weights, d<sub>c</sub> × d</p>
-<p><strong>c · [W<sub>UK</sub> | W<sub>UV</sub>] = [K | V]</strong>, laid out like x · W<sub>Q</sub> = Q</p>
-<p>Head 1 uses its slice of W<sub>Q</sub>, W<sub>UK</sub> and W<sub>UV</sub></p>
-<p>Regroup Q by head: Q<sub>h</sub> moves into the column of head h</p>
-<p>Then K and V: K<sub>h</sub>, V<sub>h</sub> rise next to Q<sub>h</sub>, <strong>own</strong> per head, as in multi-head attention</p>
-<p>Each head's attention A<sub>h</sub> = softmax(Q<sub>h</sub> K<sub>h</sub><sup>T</sup> / √d<sub>h</sub> + M)</p>
-<p>Z<sub>h</sub> = A<sub>h</sub> · V<sub>h</sub></p>
-<p>From here on, nothing changes: the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
-<p>W<sub>O</sub> is d × d, cut into H row slices</p>
-<p>Head 1 adds Z<sub>1</sub> · W<sub>O</sub><sup>(1)</sup> to O</p>
-<p>Head 2 adds Z<sub>2</sub> · W<sub>O</sub><sup>(2)</sup></p>
-<p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
-<p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>. Decode caches <strong>only c</strong>: d<sub>c</sub> numbers per token, not 2 d</p>
+<h1>MQA: Smaller KV cache, bad quality</h1>
+<div class="tr" data-tr="compare" data-upto="MQA">
+<p>So far: MHA, compute <strong>O(n²)</strong>, memory <strong>O(n)</strong></p>
+<p>MQA: compute <strong>does not move</strong>, every head still scores every key</p>
+<p>At 128K: same FLOPs, <strong>32× less KV cache</strong>, and a bit of quality lost</p>
 </div>
-
 <aside class="notes" data-markdown>
-Multi-head latent attention (MLA, DeepSeek-V2, 2024; kept in DeepSeek-V3/R1, Kimi K2):
-W_K = W_DKV · W_UK and W_V = W_DKV · W_UV, through a latent of width d_c ≪ d. GQA / MQA
-shrink the cache with fewer copies (heads share K, V); MLA with fewer numbers: every head
-keeps its own K_h, V_h, but all are rebuilt from the same c, which is all the cache holds.
-
-DeepSeek-V3: d = 7 168, 128 heads of d_h = 128, d_c = 512. Per token per layer, K and V:
-MHA 2 · 128 · 128 = 32 768 numbers, GQA with 8 groups 2 048, MQA 256, MLA 512 + 64 = 576
-(the 64: the RoPE key, below). DeepSeek-V2 reports MLA above MHA in quality (their
-ablation, appendix D). In the drawing, d = 8 units, d_h = 2, d_c = 4 (2 d_h; DeepSeek: 4 d_h).
-
-Left out of the drawing:
-- Absorption, at decode: q_h · (c W_UK)ᵀ = (q_h W_UKᵀ) · cᵀ, so W_UK moves onto the query and
-  K is never built; all heads then read the same cache of c: at decode, MLA is MQA with keys
-  of width d_c (FlashMLA). Likewise W_UV folds into W_O.
-- RoPE does not commute with W_UK (the rotation depends on the position): a small decoupled
-  key k_R = RoPE(x · W_KR), d_R = 64, shared by all heads and cached next to c.
-- The query side is low-rank too in DeepSeek (c_Q, 1 536 wide): saves parameters, not cache.
+Settings of the cost model per variant: MQA 1 KV head; SWA W = 4 096 on MHA (the window
+alone); local / global: 5 SWA layers of W = 1 024 per global layer, on MHA; GQA 8 KV heads; MLA d_c = 512 + 64, keys 192 wide; DSA top k = 2 048, indexer 32 heads
+× 128 (FP8 key); KDA one 128 × 128 state per head, chunks of 64.
+MQA saves no attention FLOPs: only the K / V projections shrink. What it saves is the cache,
+and the bytes read per decoded token, which is what decode is bound by.
+MQA quality: GQA paper (Ainslie et al. 2023), T5-XXL uptrained: MHA 47.2, MQA 46.6, GQA-8 47.1.
 </aside>
 </section>
 
 <!-- ================================================================ -->
 <section>
-<h1>DSA, aka Sparse MLA</h1>
-
-<div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-latent="4" data-unit="16" data-sparse="2">
-<p>The multi-latent layer again: H = 4 heads. Input <strong>x</strong>: n × d</p>
-<p>One product x · [W<sub>DKV</sub> | W<sub>Q</sub>]: the <strong>latent c</strong>, n × d<sub>c</sub>, and Q</p>
-<p>A copy of c starts a second product, with W<sub>UK</sub> | W<sub>UV</sub> above</p>
-<p>c · [W<sub>UK</sub> | W<sub>UV</sub>] = [K | V]</p>
-<p>Head 1 uses its slice of W<sub>Q</sub>, W<sub>UK</sub> and W<sub>UV</sub></p>
-<p>Regroup Q by head</p>
-<p>Then K and V: as in MLA, every head has its own K<sub>h</sub>, V<sub>h</sub></p>
-<p>Each head computes its MLA attention, as before: A<sub>h</sub> = softmax(Q<sub>h</sub> K<sub>h</sub><sup>T</sup> / √d<sub>h</sub> + causal mask)</p>
-<p>New: a <strong>lightning indexer</strong>, x · W<sub>I</sub> = [q<sup>I</sup> | k<sup>I</sup>]: small query heads, <strong>one small key</strong> per token</p>
-<p>Its scores I<sub>ts</sub> = Σ<sub>j</sub> w<sub>tj</sub> · ReLU(q<sup>I</sup><sub>tj</sub> · k<sup>I</sup><sub>s</sub>): one n × n map, <strong>shared by all heads</strong></p>
-<p>The <strong>top k = 2</strong> of each row of I give a mask <strong>M</strong>: 0 for the kept keys, −∞ for the others</p>
-<p>M masks <strong>every head</strong>: A<sub>h</sub> = softmax(Q<sub>h</sub> K<sub>h</sub><sup>T</sup> / √d<sub>h</sub> + M). « capital » reads « Paris », not « the »</p>
-<p>Z<sub>h</sub> = A<sub>h</sub> · V<sub>h</sub>: each row mixes at most <strong>k rows of V</strong></p>
-<p>From here on, nothing changes: the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
-<p>W<sub>O</sub> is d × d, cut into H row slices</p>
-<p>Head 1 adds Z<sub>1</sub> · W<sub>O</sub><sup>(1)</sup> to O</p>
-<p>Head 2 adds Z<sub>2</sub> · W<sub>O</sub><sup>(2)</sup></p>
-<p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
-<p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>. Decode scans every k<sup>I</sup>, but reads only <strong>k rows of c</strong></p>
-</div>
-
-<aside class="notes" data-markdown>
-DeepSeek sparse attention (DSA, DeepSeek-V3.2, 2025; GLM-5.x): MLA, plus a lightning indexer
-that picks, for every query, the k past tokens attention will read. Same weights for Q, K, V,
-same output: only the mask changes, as in SWA, but chosen by content, not by position.
-
-GLM-5.3 (config in mirage/demo/glm53_dsa): 64 heads, d_c = 512 + 64 (RoPE key), indexer of
-32 heads × 128, one key of 128 per token (FP8), top k = 2 048.
-
-Cost at decode, per layer and token, 128 K context: dense MLA reads 128 K × 1 152 B ≈ 151 MB
-of cache; DSA reads all index keys (128 K × 129 B ≈ 16.9 MB) plus 2 048 rows of c (≈ 2.4 MB):
-≈ 19 MB. The indexer is still O(n) per token, but with tiny keys, ReLU and no softmax.
-
-Left out of the drawing:
-- the kernel never computes the masked scores: per query, sparse_mla gathers the k selected
-  rows of c; same result as the mask, cost in k, not n.
-- the indexer query comes from the query latent c_Q (W_IQ: 2 048 → 32 × 128), its key and its
-  weights w from x; the index key has its own LayerNorm and RoPE.
-- GLM-5.3 IndexShare: « shared » layers reuse the top k of the previous « full » layer and run
-  no indexer.
-- Kernels (megakernel deck): dsa_index_score → dsa_index_topk → sparse_mla → dsa_mla_merge.
-- Training (to check): the indexer is first trained to match the dense attention, then the
-  model is trained sparse.
-
-The scores and the selection in the drawing are illustrative.
-</aside>
-</section>
-
-<!-- ================================================================ -->
-<section>
-<h1>Sliding-Window Attention</h1>
+<h1>Sliding-Window Attention (2020)</h1>
 
 <div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="1" data-window="2" data-unit="15">
 <p>The multi-query layer: H = 4 query heads, one key / value head. Input <strong>x</strong>: n × d</p>
@@ -304,6 +224,16 @@ With paged attention (« Inference »), the same idea frees the pages that slid 
 
 <!-- ================================================================ -->
 <section>
+<h1>SWA: constant memory use but terrible quality</h1>
+<div class="tr" data-tr="compare" data-upto="SWA">
+<p>So far: MHA and MQA, same compute, <strong>32×</strong> apart in memory</p>
+<p>SWA: both bend at n = W: <strong>O(n)</strong> compute, the cache stops growing</p>
+<p>At 128K: <strong>16×</strong> less compute, <strong>32×</strong> less KV cache, recall lost</p>
+</div>
+</section>
+
+<!-- ================================================================ -->
+<section>
 <h1>SWA: Local and global layers</h1>
 
 <div class="swa" data-swa="layers">
@@ -330,7 +260,193 @@ Qwen3-1.7B, local config.json: use_sliding_window false, sliding_window null.
 
 <!-- ================================================================ -->
 <section>
-<h1>Kimi Delta Attention</h1>
+<h1>SWA Local / global: the best of both worlds</h1>
+<div class="tr" data-tr="compare" data-upto="SWA 5:1">
+<p>So far: SWA in every layer, a bounded cache, <strong>recall lost</strong></p>
+<p>5 local layers (W = 1 024) per global one: O(n²) and O(n) again, <strong>6× lower</strong></p>
+<p>At 128K: <strong>5.6×</strong> less compute, <strong>5.8×</strong> less KV cache, quality back to ≈ MHA</p>
+</div>
+<aside class="notes" data-markdown>
+Gemma 3's pattern on the MHA layer of the cost model: per 6 layers, 5 local (W = 1 024) and
+1 global. Past a few K tokens the global layer dominates: compute and cache tend to 1/6 of MHA,
+the slopes of full attention come back. The win is a constant factor, not a complexity class.
+Quality: Gemma reports little loss from the local layers; the global layer keeps long-range recall.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Grouped-Query Attention (2023)</h1>
+
+<div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-kv="2" data-unit="15">
+<p>Same layer, H = 4 query heads, but only <strong>n<sub>kv</sub> = 2</strong> key / value heads</p>
+<p>W<sub>Q</sub> is still d × d, but W<sub>K</sub> and W<sub>V</sub> are only d × n<sub>kv</sub> d<sub>h</sub>: fewer weights, smaller K and V</p>
+<p>Head 1 uses its slice of W<sub>Q</sub>, and slice 1 of W<sub>K</sub> and W<sub>V</sub></p>
+<p>Regroup by <strong>key / value head</strong>: heads 1 and 2 share K<sub>1</sub>, V<sub>1</sub>; heads 3 and 4 share K<sub>2</sub>, V<sub>2</sub></p>
+<p>Each query head has its own <strong>attention</strong>: A<sub>1</sub> = softmax(Q<sub>1</sub> K<sub>1</sub><sup>T</sup> …), A<sub>2</sub> = softmax(Q<sub>2</sub> K<sub>1</sub><sup>T</sup> …)</p>
+<p>Z<sub>1</sub> = A<sub>1</sub> · V<sub>1</sub> and Z<sub>2</sub> = A<sub>2</sub> · V<sub>1</sub>: the same values, mixed differently</p>
+<p>From here on, nothing changes: the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
+<p>W<sub>O</sub> is d × d, cut into H row slices</p>
+<p>Head 1 adds Z<sub>1</sub> · W<sub>O</sub><sup>(1)</sup> to O</p>
+<p>Head 2 adds Z<sub>2</sub> · W<sub>O</sub><sup>(2)</sup></p>
+<p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
+<p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>: <strong>O</strong> = Z · W<sub>O</sub>, n × d, as in multi-head attention</p>
+<p>More compute and more KV cache: K and V per group per layer</p>
+<p>More accurate than MQA, less costly than MHA</p>
+</div>
+
+<aside class="notes" data-markdown>
+Grouped-query attention (GQA): n_q query heads share n_kv key / value heads, n_q / n_kv
+query heads per group. n_kv = n_q is multi-head attention, n_kv = 1 multi-query attention (MQA).
+Qwen3-1.7B: 16 query heads, 8 KV heads, the same 2 per group as here; Llama-2-7B is plain MHA.
+Why: K and V are what decoding keeps for every past token (the KV cache, in « Inference »);
+halving the KV heads halves the cache, at a small cost in quality.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>GQA: less memory, with no loss of quality</h1>
+<div class="tr" data-tr="compare" data-upto="GQA">
+<p>So far: MQA shares K / V heads, SWA forgets old tokens, unless a layer is global</p>
+<p>GQA: still the same compute, a KV cache <strong>between the two</strong></p>
+<p>At 128K: <strong>4× less KV cache</strong> than MHA, quality back to ≈ MHA</p>
+</div>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Multi-Latent Attention (2024)</h1>
+
+<div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-latent="4" data-unit="16">
+<p>The multi-head layer again: H = 4 heads. Input <strong>x</strong>: n × d</p>
+<p>One product x · [W<sub>DKV</sub> | W<sub>Q</sub>]: a narrow <strong>latent c</strong>, n × d<sub>c</sub>, and Q</p>
+<p>A copy of c starts a <strong>second product</strong>, with W<sub>UK</sub> | W<sub>UV</sub> above: short weights, d<sub>c</sub> × d</p>
+<p><strong>c · [W<sub>UK</sub> | W<sub>UV</sub>] = [K | V]</strong>, laid out like x · W<sub>Q</sub> = Q</p>
+<p>Head 1 uses its slice of W<sub>Q</sub>, W<sub>UK</sub> and W<sub>UV</sub></p>
+<p>Regroup Q by head: Q<sub>h</sub> moves into the column of head h</p>
+<p>Then K and V: K<sub>h</sub>, V<sub>h</sub> rise next to Q<sub>h</sub>, <strong>own</strong> per head, as in multi-head attention</p>
+<p>Each head's attention A<sub>h</sub> = softmax(Q<sub>h</sub> K<sub>h</sub><sup>T</sup> / √d<sub>h</sub> + M)</p>
+<p>Z<sub>h</sub> = A<sub>h</sub> · V<sub>h</sub></p>
+<p>From here on, nothing changes: the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
+<p>W<sub>O</sub> is d × d, cut into H row slices</p>
+<p>Head 1 adds Z<sub>1</sub> · W<sub>O</sub><sup>(1)</sup> to O</p>
+<p>Head 2 adds Z<sub>2</sub> · W<sub>O</sub><sup>(2)</sup></p>
+<p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
+<p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>. Decode caches <strong>only c</strong>: d<sub>c</sub> numbers per token, not 2 d</p>
+</div>
+
+<aside class="notes" data-markdown>
+Multi-head latent attention (MLA, DeepSeek-V2, 2024; kept in DeepSeek-V3/R1, Kimi K2):
+W_K = W_DKV · W_UK and W_V = W_DKV · W_UV, through a latent of width d_c ≪ d. GQA / MQA
+shrink the cache with fewer copies (heads share K, V); MLA with fewer numbers: every head
+keeps its own K_h, V_h, but all are rebuilt from the same c, which is all the cache holds.
+
+DeepSeek-V3: d = 7 168, 128 heads of d_h = 128, d_c = 512. Per token per layer, K and V:
+MHA 2 · 128 · 128 = 32 768 numbers, GQA with 8 groups 2 048, MQA 256, MLA 512 + 64 = 576
+(the 64: the RoPE key, below). DeepSeek-V2 reports MLA above MHA in quality (their
+ablation, appendix D). In the drawing, d = 8 units, d_h = 2, d_c = 4 (2 d_h; DeepSeek: 4 d_h).
+
+Left out of the drawing:
+- Absorption, at decode: q_h · (c W_UK)ᵀ = (q_h W_UKᵀ) · cᵀ, so W_UK moves onto the query and
+  K is never built; all heads then read the same cache of c: at decode, MLA is MQA with keys
+  of width d_c (FlashMLA). Likewise W_UV folds into W_O.
+- RoPE does not commute with W_UK (the rotation depends on the position): a small decoupled
+  key k_R = RoPE(x · W_KR), d_R = 64, shared by all heads and cached next to c.
+- The query side is low-rank too in DeepSeek (c_Q, 1 536 wide): saves parameters, not cache.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>MLA: less memory, no loss of quality</h1>
+<div class="tr" data-tr="compare" data-upto="MLA">
+<p>So far: the cache cut by sharing heads (MQA, GQA) or by a window (SWA)</p>
+<p>MLA: a bit <strong>more</strong> compute, a KV cache between MQA and GQA</p>
+<p>At 128K: <strong>14× less KV cache</strong> than MHA, quality <strong>on par</strong></p>
+</div>
+<aside class="notes" data-markdown>
+MLA does not make the attention cheaper: every head still has its own K_h, V_h, keys 192 wide
+(128 + 64 RoPE) against 128, so the prefill core costs 320 / 256 = 1.25× MHA. It saves on the
+K / V projections (≈ 6.5 M against 33.5 M multiply-adds per token here), linear in n: with the
+projections counted, MLA is cheaper up to n ≈ 13 K. At decode, with W_UK absorbed, each head
+scores against c, 576 wide: ≈ 4× the FLOPs of MHA per cached token, for 14× fewer bytes read.
+Quality: DeepSeek-V2 reports MLA above MHA (one ablation); TransMLA (2025) proves MLA ≥ GQA at
+equal cache size. Graded ≈ MHA here.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>DSA, aka Sparse MLA (2025)</h1>
+
+<div class="viz viz-boxed" data-anim="heads" data-tokens="Paris ␣is ␣the ␣capital" data-heads="4" data-latent="4" data-unit="16" data-sparse="2">
+<p>The multi-latent layer again: H = 4 heads. Input <strong>x</strong>: n × d</p>
+<p>One product x · [W<sub>DKV</sub> | W<sub>Q</sub>]: the <strong>latent c</strong>, n × d<sub>c</sub>, and Q</p>
+<p>A copy of c starts a second product, with W<sub>UK</sub> | W<sub>UV</sub> above</p>
+<p>c · [W<sub>UK</sub> | W<sub>UV</sub>] = [K | V]</p>
+<p>Head 1 uses its slice of W<sub>Q</sub>, W<sub>UK</sub> and W<sub>UV</sub></p>
+<p>Regroup Q by head</p>
+<p>Then K and V: as in MLA, every head has its own K<sub>h</sub>, V<sub>h</sub></p>
+<p>Each head computes its MLA attention, as before: A<sub>h</sub> = softmax(Q<sub>h</sub> K<sub>h</sub><sup>T</sup> / √d<sub>h</sub> + causal mask)</p>
+<p>New: a <strong>lightning indexer</strong>, x · W<sub>I</sub> = [q<sup>I</sup> | k<sup>I</sup>]: small query heads, <strong>one small key</strong> per token</p>
+<p>Its scores I<sub>ts</sub> = Σ<sub>j</sub> w<sub>tj</sub> · ReLU(q<sup>I</sup><sub>tj</sub> · k<sup>I</sup><sub>s</sub>): one n × n map, <strong>shared by all heads</strong></p>
+<p>The <strong>top k = 2</strong> of each row of I give a mask <strong>M</strong>: 0 for the kept keys, −∞ for the others</p>
+<p>M masks <strong>every head</strong>: A<sub>h</sub> = softmax(Q<sub>h</sub> K<sub>h</sub><sup>T</sup> / √d<sub>h</sub> + M). « capital » reads « Paris », not « the »</p>
+<p>Z<sub>h</sub> = A<sub>h</sub> · V<sub>h</sub>: each row mixes at most <strong>k rows of V</strong></p>
+<p>From here on, nothing changes: the Z<sub>h</sub> form <strong>Z</strong>, n × d</p>
+<p>W<sub>O</sub> is d × d, cut into H row slices</p>
+<p>Head 1 adds Z<sub>1</sub> · W<sub>O</sub><sup>(1)</sup> to O</p>
+<p>Head 2 adds Z<sub>2</sub> · W<sub>O</sub><sup>(2)</sup></p>
+<p>Head 3 adds Z<sub>3</sub> · W<sub>O</sub><sup>(3)</sup></p>
+<p>Head 4 adds Z<sub>4</sub> · W<sub>O</sub><sup>(4)</sup>. Decode scans every k<sup>I</sup>, but reads only <strong>k rows of c</strong></p>
+</div>
+
+<aside class="notes" data-markdown>
+DeepSeek sparse attention (DSA, DeepSeek-V3.2, 2025; GLM-5.x): MLA, plus a lightning indexer
+that picks, for every query, the k past tokens attention will read. Same weights for Q, K, V,
+same output: only the mask changes, as in SWA, but chosen by content, not by position.
+
+GLM-5.3 (config in mirage/demo/glm53_dsa): 64 heads, d_c = 512 + 64 (RoPE key), indexer of
+32 heads × 128, one key of 128 per token (FP8), top k = 2 048.
+
+Cost at decode, per layer and token, 128 K context: dense MLA reads 128 K × 1 152 B ≈ 151 MB
+of cache; DSA reads all index keys (128 K × 129 B ≈ 16.9 MB) plus 2 048 rows of c (≈ 2.4 MB):
+≈ 19 MB. The indexer is still O(n) per token, but with tiny keys, ReLU and no softmax.
+
+Left out of the drawing:
+- the kernel never computes the masked scores: per query, sparse_mla gathers the k selected
+  rows of c; same result as the mask, cost in k, not n.
+- the indexer query comes from the query latent c_Q (W_IQ: 2 048 → 32 × 128), its key and its
+  weights w from x; the index key has its own LayerNorm and RoPE.
+- GLM-5.3 IndexShare: « shared » layers reuse the top k of the previous « full » layer and run
+  no indexer.
+- Kernels (megakernel deck): dsa_index_score → dsa_index_topk → sparse_mla → dsa_mla_merge.
+- Training (to check): the indexer is first trained to match the dense attention, then the
+  model is trained sparse.
+
+The scores and the selection in the drawing are illustrative.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>DSA: less compute, no loss of quality</h1>
+<div class="tr" data-tr="compare" data-upto="DSA">
+<p>So far: MLA, same O(n²) as MHA, <strong>14×</strong> less KV cache</p>
+<p>DSA: the indexer is still <strong>O(n²)</strong>, but attention reads only k keys</p>
+<p>At 128K: about <strong>2×</strong> less compute, a cache slightly larger than MLA’s</p>
+</div>
+<aside class="notes" data-markdown>
+DSA's indexer scores every past key (32 heads × 128, FP8, no softmax): O(n²) with a smaller
+constant. The cache holds c plus one index key per token: 1 280 B per token and layer, against
+1 152 B for MLA. The FP8 indexer is cheaper per FLOP than this count suggests.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>Kimi Delta Attention (2025)</h1>
 
 <div class="viz viz-boxed" data-anim="kda" data-tokens="Paris ␣is ␣the ␣capital">
 <p>One head. Input <strong>x</strong>: n × d, one row per token</p>
@@ -408,6 +524,79 @@ equals S_4 there (checked in the script).
 </aside>
 </section>
 
+<!-- ================================================================ -->
+<section>
+<h1>KDA: best compute, best memory, terrible quality</h1>
+<div class="tr" data-tr="compare" data-upto="KDA">
+<p>So far: all O(n²) but SWA, whose cache flattens at W</p>
+<p>KDA: compute <strong>O(n)</strong>, memory <strong>O(1)</strong> from the first token</p>
+<p>At 128K: <strong>256×</strong> less compute, <strong>2 048×</strong> less memory, worst recall</p>
+</div>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>KDA 3:1 : great memory, best quality</h1>
+<div class="tr" data-tr="compare" data-upto="KDA 3:1">
+<p>So far: KDA alone, O(n) compute, a fixed state, but the <strong>worst recall</strong></p>
+<p>3 KDA layers per MLA layer: O(n²) and O(n) again, from the MLA layers</p>
+<p>At 128K: <strong>3.2×</strong> less compute, <strong>56×</strong> less KV cache, quality <strong>above</strong> MHA</p>
+</div>
+<aside class="notes" data-markdown>
+Kimi Linear's pattern (Moonshot, 2025; also GLM-5.3-Flash with DSA in place of MLA): per 4
+layers, 3 KDA and 1 MLA. Past a few K tokens the MLA layer dominates: the cache tends to 1/4 of
+MLA's (4× less, 56× less than MHA), the compute to 1/4 of MLA's (3.2× less than MHA, MLA being
+1.25× MHA). As with local / global layers, a constant factor, not a complexity class.
+Quality: in a matched run (1.4 T tokens), Kimi Linear beats full MLA, RULER at 128K 84.3
+against 81.3; the MLA layer keeps exact recall, the KDA layers the cheap bulk of the work.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section data-section>
+<h1>Ten years of attention</h1>
+<div class="tr" data-tr="plane">
+<p>2017: multi-head attention, the reference for quality and for cost</p>
+<p>2019: MQA shares one K / V head, the cache drops, so does quality</p>
+<p>2020: sliding windows bound the cache and the compute, recall suffers</p>
+<p>2023: GQA, a middle ground, gets <strong>quality back</strong></p>
+<p>2024: MLA compresses K / V: smaller cache, quality <strong>on par</strong></p>
+<p>2024: local and global layers: windows, with quality back</p>
+<p>2025: DSA, MLA reading only the top k keys: compute down</p>
+<p>2025: KDA, a fixed-size state: the cheapest, the worst recall</p>
+<p>2025: 3 KDA layers per MLA layer: <strong>cheap and good</strong></p>
+</div>
+<aside class="notes" data-markdown>
+Same cost model as the « where it stands » slides, read at n = 128K. Arrows: lineage
+(MHA → MQA → GQA, SWA → local / global, MLA → DSA, KDA → KDA 3:1).
+Hybrids: « SWA 5:1 » is Gemma 3's pattern (5 layers W = 1 024 per global layer; Gemma 2 was 1:1),
+« KDA 3:1 » is Kimi Linear (3 KDA layers per MLA layer).
+Quality grades, from each paper's ablations: MQA below MHA (GQA paper); GQA ≈ MHA; MLA ≈ MHA
+(DeepSeek-V2 reports better, one ablation); DSA ≈ MLA (DeepSeek-V3.2); SWA alone and KDA alone
+below on long-range recall; local / global ≈ (Gemma); Kimi Linear above full MLA in a matched
+run (1.4 T tokens): RULER at 128K 84.3 against 81.3.
+SWA dates from Longformer (2020); in production in Mistral 7B (2023).
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section data-section>
+<h1>Conclusion</h1>
+
+<div class="tr-concl">
+<div><h2>Long context is costly</h2><p>Attention is O(n²) in compute and O(n) in memory</p><p class="tr-who">MHA</p></div>
+<div><h2>Shrink the memory</h2><p>Sharing or compressing K and V shrinks the KV cache</p><p class="tr-who">MQA · GQA · MLA</p></div>
+<div><h2>Shrink the compute</h2><p>Windows, sparsity and recurrent states cut compute, at a cost in quality</p><p class="tr-who">SWA · DSA · KDA</p></div>
+<div class="tr-best"><h2>Mix the layers</h2><p>Hybrids of cheap and full layers: the best compromise</p><p class="tr-who">SWA 5:1 · KDA 3:1</p></div>
+</div>
+
+<aside class="notes" data-markdown>
+Sharing: MQA, GQA. Compressing: MLA. Windows: SWA. Sparsity: DSA. Recurrent state: KDA.
+Hybrids: local / global layers (Gemma), KDA / MLA (Kimi Linear).
+Cheap layers do the bulk of the work, a few full layers keep exact recall: the full layers set
+the slopes (O(n²), O(n)), the cheap ones divide the constant.
+</aside>
+</section>
 
 </div>
 </div>
@@ -416,6 +605,7 @@ equals S_4 there (checked in the script).
 <script src="themes/kda.js"></script>
 <script src="themes/kda-matrices.js"></script>
 <script src="themes/swa.js"></script>
+<script src="themes/tradeoffs.js"></script>
 <script src="vendor/reveal/reveal.js"></script>
 <script src="vendor/reveal/notes.js"></script>
 <script src="themes/deck.js"></script>
