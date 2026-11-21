@@ -86,7 +86,7 @@ window.MathJax = {
 
 <!-- ================================================================ -->
 <section>
-<h1>MHA: The reference</h1>
+<h1>MHA: the reference</h1>
 <div class="tr" data-tr="compare" data-upto="MHA">
 <p>Two plots, <strong>log-log</strong>: context n from 1K to 1M tokens, ×4 per tick</p>
 <p>MHA: the compute of a prefill of n tokens, and the KV cache it leaves</p>
@@ -137,7 +137,7 @@ decode is bound by. The cost is quality and training stability, hence GQA as the
 
 <!-- ================================================================ -->
 <section>
-<h1>MQA: Smaller KV cache, bad quality</h1>
+<h1>MQA: smaller KV cache, bad quality</h1>
 <div class="tr" data-tr="compare" data-upto="MQA">
 <p>So far: MHA, compute <strong>O(n²)</strong>, memory <strong>O(n)</strong></p>
 <p>MQA: compute <strong>does not move</strong>, every head still scores every key</p>
@@ -197,7 +197,7 @@ all n² scores and throws most of them away.
 
 <!-- ================================================================ -->
 <section>
-<h1>SWA: A bounded KV cache</h1>
+<h1>SWA: a bounded KV cache</h1>
 
 <div class="swa" data-swa="cache" data-window="2">
 <p>Decoding « The »: its K and V go into <strong>both caches</strong></p>
@@ -235,7 +235,7 @@ With paged attention (« Inference »), the same idea frees the pages that slid 
 
 <!-- ================================================================ -->
 <section>
-<h1>SWA: Local and global layers</h1>
+<h1>SWA: local and global layers</h1>
 
 <div class="swa" data-swa="layers">
 <p>Mistral 7B: <strong>every layer</strong> is a sliding window, W = 4 096</p>
@@ -261,7 +261,7 @@ Qwen3-1.7B, local config.json: use_sliding_window false, sliding_window null.
 
 <!-- ================================================================ -->
 <section>
-<h1>SWA Local / global: the best of both worlds</h1>
+<h1>SWA local / global: the best of both worlds</h1>
 <div class="tr" data-tr="compare" data-upto="SWA 5:1">
 <p>So far: SWA in every layer, a bounded cache, <strong>recall lost</strong></p>
 <p>5 local layers (W = 1 024) per global one: O(n²) and O(n) again, <strong>6× lower</strong></p>
@@ -560,7 +560,7 @@ The numbers in the drawing are made up, but the recurrence is computed from them
 
 <!-- ================================================================ -->
 <section>
-<h1>KDA State Update</h1>
+<h1>KDA state update</h1>
 
 <div class="viz viz-boxed" data-anim="kda-matrices">
 <p>Eq. 1 is <strong>linear in S</strong>: S<sub>t</sub> = A<sub>t</sub> S<sub>t−1</sub> + B<sub>t</sub>, A<sub>t</sub> and B<sub>t</sub> made from token t alone. d<sub>k</sub> = d<sub>v</sub> = 4</p>
