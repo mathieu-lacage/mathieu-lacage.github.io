@@ -72,11 +72,14 @@
     const under = (x, w, y, src, opt) => tex(x - 40, y, w + 80, src, { ...opt, cls: 'ke-under' });
     const op = (x0, x1, y, s, vis) => text(x0, y + M / 2 - 13, x1 - x0, s, { vis });
 
-    // one row, read left to right as eq. 1: (I − β k kᵀ) · Diag(α) = A_t, A_t · S_{t−1}, + B_t = S_t.
+    // one row, in the order of eq. 1: S_t = (I − β k kᵀ) · Diag(α) · S_{t−1} + B_t, products chained as
+    // (I − β k kᵀ) · Diag(α) = A_t, A_t · S_{t−1}; then, after « where », I − β k kᵀ built from I and β k kᵀ.
     // Every product A · B = C has A left of C and B above it.
     const Y = 262, YU = Y - g - M, YL = Y + M + 4;
-    const X = { I: 0, k: 140, kk: 140 + cs + g, E: 314, A: 314 + M + 50, P: 314 + 2 * (M + 50) };
-    X.B = X.P + M + 44; X.S = X.B + M + 44;
+    // as the equation: S_t = E_t · Diag(α_t) · S_{t−1} + B_t, with E_t = I − β_t k_t k_tᵀ defined on the right
+    const X = { S: 0 };
+    X.E = X.S + M + 44; X.A = X.E + M + 50; X.P = X.A + M + 50; X.B = X.P + M + 44;
+    X.w = X.B + M + 24; X.I = X.w + 62; X.k = X.I + M + 28; X.kk = X.k + cs + g; X.E2 = X.kk + M + 28;
     const els = [];
     const ob = (s, lab) => `\\overbrace{${s}}^{${lab}}`;
     els.push(tex(0, 0, 1136, `S_t = ${cl('A', ob(`${cl('erase', ub(`(I-${T.b}\\,${T.k}${T.kT})`, '\\text{erase at }k_t'))}\\,\\,${cl('forget', ub(`\\mathrm{Diag}(${T.a})`, '\\text{forget}'))}`, 'A_t'))}\\,\\,`
@@ -90,7 +93,11 @@
       grid(X.kk, Y - g - cs, [t.k], COL.k, { vis: [from(EMAT)], max: 1 }),
       grid(X.kk, Y, KK, COL.k, { vis: [from(EMAT)] }),
       under(X.k, X.kk + M - X.k, YL, `${T.b}\\,${T.k}${T.kT}`, { vis: [from(EMAT)] }),
-      op(X.kk + M, X.E, Y, '=', [from(EMAT)]),
+      op(X.kk + M, X.E2, Y, '=', [from(EMAT)]),
+      grid(X.E2, Y, Et, COL.k, { vis: [from(EMAT)], hl: [one(EMAT)], max: 1 }),
+      under(X.E2, M, YL, `I-${T.b}\\,${T.k}${T.kT}`, { vis: [from(EMAT)] }),
+      text(X.w, Y + M / 2 - 13, X.I - X.w, 'where', { vis: [from(EMAT)], cls: 'kv-dim' }),
+      // the same matrix, in its place in the product
       grid(X.E, Y, Et, COL.k, { vis: [from(EMAT)], hl: [one(EMAT), one(AMAT)], max: 1 }),
       under(X.E, M, YL, `I-${T.b}\\,${T.k}${T.kT}`, { vis: [from(EMAT)] }));
     // A_t = (I − β k kᵀ) · Diag(α_t): column j times α_{t,j}
@@ -107,9 +114,9 @@
     els.push(op(X.P + M, X.B, Y, '+', [from(WRITE)]),
       grid(X.B, Y, B, COL.v, { vis: [from(WRITE)], hl: [one(WRITE)] }),
       under(X.B, M, YL, `B_t = ${T.b}\\,${T.k}${T.vT}`, { vis: [from(WRITE)] }),
-      op(X.B + M, X.S, Y, '=', [from(WRITE)]),
       grid(X.S, Y, St, COL.s, { vis: [from(WRITE)], hl: [one(WRITE)] }),
-      under(X.S, M, YL, 'S_t', { vis: [from(WRITE)] }));
+      under(X.S, M, YL, 'S_t', { vis: [from(WRITE)] }),
+      op(X.S + M, X.E, Y, '=', [from(WRITE)]));
 
     AD.mount(root, ctx, FINAL, els, (st) => { root.dataset.st = Math.min(st, FINAL); });
   }

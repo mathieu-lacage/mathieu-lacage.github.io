@@ -308,7 +308,7 @@ Left out: the feature map φ (elu + 1) and the normalization z_t / (q_tᵀ Σ k_
 
 <!-- ================================================================ -->
 <section>
-<h1>Linear: State Update</h1>
+<h1>Linear attention state update</h1>
 
 <div class="viz viz-boxed" data-anim="lin-matrices">
 <p>One token t: S<sub>t</sub> = S<sub>t−1</sub> + k<sub>t</sub> v<sub>t</sub><sup>T</sup>. d<sub>k</sub> = d<sub>v</sub> = 4</p>
@@ -325,7 +325,7 @@ Numbers: tokens 1–3 of the linear animation give S_{t−1}, token 4 is t; S_t 
 
 <!-- ================================================================ -->
 <section>
-<h1>Linear: the cheapest, terrible quality</h1>
+<h1>Linear attention: cheap, terrible quality</h1>
 <div class="tr" data-tr="compare" data-upto="Linear">
 <p>So far: every variant keeps every past token, or the last W</p>
 <p>Linear attention: compute <strong>O(n)</strong>, memory <strong>O(1)</strong> from the first token</p>
@@ -505,29 +505,6 @@ constant. The cache holds c plus one index key per token: 1 280 B per token and 
 
 <!-- ================================================================ -->
 <section>
-<h1>From linear attention to KDA</h1>
-<p class="lin-head">Every model reads its state the same way, $z_t = S_t^\top q_t$; they differ by how they write it</p>
-<table class="lin-road">
-<tr><td>2020</td><td>Linear attention</td><td>$S_t = S_{t-1} + k_t v_t^\top$</td><td>a d × d state, no n × n scores</td></tr>
-<tr class="fragment"><td>2023</td><td>RetNet</td><td>$S_t = {\color{#f5c451}\gamma}\, S_{t-1} + k_t v_t^\top$</td><td>forget: a fixed decay γ per head</td></tr>
-<tr class="fragment"><td>2023</td><td>Mamba, GLA</td><td>$S_t = {\color{#f5c451}\mathrm{Diag}(\alpha_t)}\, S_{t-1} + k_t v_t^\top$</td><td>forget what the input says: α<sub>t</sub> from x<sub>t</sub></td></tr>
-<tr class="fragment"><td>2024</td><td>DeltaNet</td><td>$S_t = S_{t-1} + \beta_t k_t ({\color{#f5c451}v_t - S_{t-1}^\top k_t})^\top$</td><td>overwrite, don't add: write the error</td></tr>
-<tr class="fragment"><td>2024</td><td>Gated DeltaNet</td><td>$S_t = {\color{#f5c451}\alpha_t} (I - \beta_t k_t k_t^\top) S_{t-1} + \beta_t k_t v_t^\top$</td><td>both: decay and delta</td></tr>
-<tr class="fragment lin-kda"><td>2025</td><td>KDA</td><td>$S_t = (I - \beta_t k_t k_t^\top)\, {\color{#f5c451}\mathrm{Diag}(\alpha_t)}\, S_{t-1} + \beta_t k_t v_t^\top$</td><td>a decay per key channel</td></tr>
-</table>
-<p class="lin-foot fragment">Still a fixed-size state: recall needs a few <strong>full attention</strong> layers, hence the hybrids</p>
-<aside class="notes" data-markdown>
-The gold term is what each step adds. Sources: RetNet (Sun et al. 2023); GLA (Yang et al. 2023,
-gated linear attention, a per-channel data-dependent decay); Mamba (Gu, Dao 2023) is a selective
-SSM, written here in its linear-attention form (Mamba-2 makes the link exact, with a scalar decay
-per head); DeltaNet (Schlag et al. 2021, made parallel by Yang et al. 2024); Gated DeltaNet
-(Yang et al. 2024, used by Qwen3-Next in a 3:1 hybrid); KDA (Kimi Linear, 2025), the update of
-the KDA slides.
-</aside>
-</section>
-
-<!-- ================================================================ -->
-<section>
 <h1>Kimi Delta Attention (2025)</h1>
 
 <div class="viz viz-boxed" data-anim="kda" data-tokens="Paris ␣is ␣the ␣capital">
@@ -583,7 +560,7 @@ The numbers in the drawing are made up, but the recurrence is computed from them
 
 <!-- ================================================================ -->
 <section>
-<h1>KDA: State Update</h1>
+<h1>KDA State Update</h1>
 
 <div class="viz viz-boxed" data-anim="kda-matrices">
 <p>Eq. 1 is <strong>linear in S</strong>: S<sub>t</sub> = A<sub>t</sub> S<sub>t−1</sub> + B<sub>t</sub>, A<sub>t</sub> and B<sub>t</sub> made from token t alone. d<sub>k</sub> = d<sub>v</sub> = 4</p>
@@ -631,6 +608,29 @@ MLA's (4× less, 56× less than MHA), the compute to 1/4 of MLA's (3.2× less th
 1.25× MHA). As with local / global layers, a constant factor, not a complexity class.
 Quality: in a matched run (1.4 T tokens), Kimi Linear beats full MLA, RULER at 128K 84.3
 against 81.3; the MLA layer keeps exact recall, the KDA layers the cheap bulk of the work.
+</aside>
+</section>
+
+<!-- ================================================================ -->
+<section>
+<h1>From linear attention to KDA</h1>
+<p class="lin-head">Every model reads its state the same way, $z_t = S_t^\top q_t$; they differ by how they write it</p>
+<table class="lin-road">
+<tr><td>2020</td><td>Linear attention</td><td>$S_t = S_{t-1} + k_t v_t^\top$</td><td>a d × d state, no n × n scores</td></tr>
+<tr class="fragment"><td>2023</td><td>RetNet</td><td>$S_t = {\color{#f5c451}\gamma}\, S_{t-1} + k_t v_t^\top$</td><td>forget: a fixed decay γ per head</td></tr>
+<tr class="fragment"><td>2023</td><td>Mamba, GLA</td><td>$S_t = {\color{#f5c451}\mathrm{Diag}(\alpha_t)}\, S_{t-1} + k_t v_t^\top$</td><td>forget what the input says: α<sub>t</sub> from x<sub>t</sub></td></tr>
+<tr class="fragment"><td>2024</td><td>DeltaNet</td><td>$S_t = S_{t-1} + \beta_t k_t ({\color{#f5c451}v_t - S_{t-1}^\top k_t})^\top$</td><td>overwrite, don't add: write the error</td></tr>
+<tr class="fragment"><td>2024</td><td>Gated DeltaNet</td><td>$S_t = {\color{#f5c451}\alpha_t} (I - \beta_t k_t k_t^\top) S_{t-1} + \beta_t k_t v_t^\top$</td><td>both: decay and delta</td></tr>
+<tr class="fragment lin-kda"><td>2025</td><td>KDA</td><td>$S_t = (I - \beta_t k_t k_t^\top)\, {\color{#f5c451}\mathrm{Diag}(\alpha_t)}\, S_{t-1} + \beta_t k_t v_t^\top$</td><td>a decay per key channel</td></tr>
+</table>
+<p class="lin-foot fragment">Still a fixed-size state: recall needs a few <strong>full attention</strong> layers, hence the hybrids</p>
+<aside class="notes" data-markdown>
+The gold term is what each step adds. Sources: RetNet (Sun et al. 2023); GLA (Yang et al. 2023,
+gated linear attention, a per-channel data-dependent decay); Mamba (Gu, Dao 2023) is a selective
+SSM, written here in its linear-attention form (Mamba-2 makes the link exact, with a scalar decay
+per head); DeltaNet (Schlag et al. 2021, made parallel by Yang et al. 2024); Gated DeltaNet
+(Yang et al. 2024, used by Qwen3-Next in a 3:1 hybrid); KDA (Kimi Linear, 2025), the update of
+the KDA slides.
 </aside>
 </section>
 
